@@ -2,28 +2,18 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
-class Role(Base):
-    __tablename__ = "roles"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    users = relationship("User", back_populates="role")
 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=True)
-    nim = Column(String(255), unique=True, nullable=True)
-    email = Column(String(255), unique=True, nullable=True)
-    password = Column(String(255), nullable=True)
-    phone_number = Column(String(255), nullable=True)
-    role_id = Column(Integer, ForeignKey("roles.id"))
-    role = relationship("Role", back_populates="users")
     author = relationship("Author", back_populates="user", uselist=False)
 
 class Author(Base):
     __tablename__ = "authors"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    sinta_profile_url = Column(String(255), nullable=True)
     sinta_score_3yr = Column(Integer, nullable=True)
     sinta_score_total = Column(Integer, nullable=True)
     affil_score_3yr = Column(Integer, nullable=True)

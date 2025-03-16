@@ -39,6 +39,7 @@ def scrape_sinta():
                 results.append(
                     CrawlAuthors(
                         lecturer_name=name,
+                        sinta_profile_url=profile_link,
                         sinta_id=sinta_id,
                         profile_link=profile_link,
                         sinta_score_3yr=sinta_score_3yr,
@@ -67,6 +68,7 @@ def save_scraped_data(scraped_data: list[CrawlAuthors], db: Session):
         # Simpan data ke tabel Authors
         author = Author(
             user_id=user.id,  # Hubungkan dengan user yang baru dibuat
+            sinta_profile_url=str(data.sinta_profile_url),
             sinta_score_3yr=int(data.sinta_score_3yr) if data.sinta_score_3yr.isdigit() else None,
             sinta_score_total=int(data.sinta_score_total) if data.sinta_score_total.isdigit() else None,
             affil_score_3yr=int(data.affil_score_3yr) if data.affil_score_3yr.isdigit() else None,
