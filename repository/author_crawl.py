@@ -61,10 +61,10 @@ def save_scraped_data(scraped_data: list[CrawlAuthors], db: Session):
             # Jika belum ada, buat user baru
             user = User(name=data.lecturer_name)
             db.add(user)
-            db.commit()
+            db.commit()  # Memastikan user.id tersedia sebelum digunakan
             db.refresh(user)
 
-        # Cek apakah author dengan user_id dan sinta_profile_url sudah ada di database
+        # Cek apakah author dengan user_id sudah ada
         existing_author = db.query(Author).filter(
             Author.user_id == user.id,
             Author.sinta_profile_url == str(data.sinta_profile_url)

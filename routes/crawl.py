@@ -5,7 +5,7 @@ from repository.author_crawl import scrape_sinta, save_scraped_data
 from models import User, Author
 from schemas import PaperResponse
 from typing import List
-from repository.garuda_abstract_crawl import scrape_garuda_data 
+from repository.garuda_abstract_crawl import scrape_garuda_data , save_scraped_data
 
 router = APIRouter()
 
@@ -23,12 +23,14 @@ async def scrape_authors(db: Session = Depends(get_db)):
 async def scrape_garuda_route(db: Session = Depends(get_db)):
     results = []
 
-    # Mengambil data dosen (nama + profil Sinta) dari database
+    # Mengambil data dosen dari database
     lecturers = db.query(User.name, Author.sinta_profile_url).join(Author, User.id == Author.user_id).all()
 
     for lecturer_name, profile_link in lecturers:
-        if profile_link:  # Pastikan profil Sinta tersedia
-            results.extend(scrape_garuda_data(lecturer_name, profile_link))
+        if profile_link:
+            scraped_data = scrape_garuda_data(lecturer_name, profile_link)  # Scraping
+            save_scraped_data(db, scraped_data)  # Simpan hasil scraping ke database
+            results.extend(scraped_data)
 
     return results
 

@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import re
 from typing import List
 from schemas import PaperResponse
+from sqlalchemy.orm import Session
+from models import Article, User, Author, PublicationAuthor
 
 def scrape_garuda_data(lecturer_name: str, profile_link: str) -> List[PaperResponse]:
     garuda_url = f"{profile_link}?view=garuda"
@@ -56,3 +58,59 @@ def scrape_garuda_data(lecturer_name: str, profile_link: str) -> List[PaperRespo
             ))
 
     return papers
+
+def save_scraped_data(db: Session, scraped_data: List[PaperResponse]):
+    for paper in scraped_data:
+        # Cek apakah artikel sudah ada di database berdasarkan DOI atau judul
+        article = db.query(Article).filter((Article.doi == paper.doi) | (Article.title == paper.title)).first()
+
+        if not article:
+            # Jika artikel belum ada, simpan ke tabel articles
+            article = Article(
+                title=paper.title,
+                year=int(paper.year) if paper.year.isdigit() else None,
+                doi=paper.doi if paper.doi != "N/A" else None,
+                accred=paper.accred,
+                article_url=paper.publication_link,
+                journal=paper.journal_category,
+                abstract="",
+                citation_count=None
+            )
+            db.add(article)
+            db.commit()
+            db.refresh(article)  # Mendapatkan ID yang baru saja disimpan
+        
+        # Cek apakah lecturer_name ada di tabel User
+        lecturer = db.query(User).filter(User.name == paper.lecturer_name).first()
+
+        if lecturer:
+            lecturer_id = lecturer.id
+        else:
+            lecturer_id = None  # Jika tidak ditemukan, tidak bisa dimasukkan ke publication_authors
+
+        # Simpan data author dan hubungan dengan artikel
+        for author_name in paper.authors:
+            author = db.query(Author).filter(Author.name == author_name).first()
+            if not author:
+                author = Author(name=author_name)
+                db.add(author)
+                db.commit()
+                db.refresh(author)
+            
+            # Jika author cocok dengan lecturer_name, gunakan lecturer_id sebagai author_id
+            if author.name == paper.lecturer_name and lecturer_id:
+                author_id = lecturer_id
+            else:
+                author_id = author.id
+
+            # Cek apakah sudah ada hubungan antara author dan article
+            pub_author = db.query(PublicationAuthor).filter_by(article_id=article.id, author_id=author_id).first()
+            if not pub_author:
+                pub_author = PublicationAuthor(
+                    article_id=article.id,
+                    author_id=author_id,
+                    author_order=int(paper.author_order) if paper.author_order.isdigit() else 0
+                )
+                db.add(pub_author)
+
+        db.commit()
