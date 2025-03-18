@@ -7,7 +7,6 @@ from schemas import CrawlAuthors
 
 BASE_URL = "https://sinta.kemdikbud.go.id/departments/authors/20/896879FE-5FBE-4AB0-A7CD-3FAD1EEE3CFF/6635C54C-E05B-4161-A443-BCCA6926474A"
 
-# User-Agent agar tidak terdeteksi sebagai bot
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -65,15 +64,22 @@ def save_scraped_data(scraped_data: list[CrawlAuthors], db: Session):
             db.commit()
             db.refresh(user)
 
-        # Simpan data ke tabel Authors
-        author = Author(
-            user_id=user.id,  # Hubungkan dengan user yang baru dibuat
-            sinta_profile_url=str(data.sinta_profile_url),
-            sinta_score_3yr=int(data.sinta_score_3yr) if data.sinta_score_3yr.isdigit() else None,
-            sinta_score_total=int(data.sinta_score_total) if data.sinta_score_total.isdigit() else None,
-            affil_score_3yr=int(data.affil_score_3yr) if data.affil_score_3yr.isdigit() else None,
-            affil_score_total=int(data.affil_score_total) if data.affil_score_total.isdigit() else None,
-        )
-        db.add(author)
+        # Cek apakah author dengan user_id dan sinta_profile_url sudah ada di database
+        existing_author = db.query(Author).filter(
+            Author.user_id == user.id,
+            Author.sinta_profile_url == str(data.sinta_profile_url)
+        ).first()
+
+        if not existing_author:
+            # Jika belum ada, tambahkan data author baru
+            author = Author(
+                user_id=user.id,
+                sinta_profile_url=str(data.sinta_profile_url),
+                sinta_score_3yr=int(data.sinta_score_3yr) if data.sinta_score_3yr.isdigit() else None,
+                sinta_score_total=int(data.sinta_score_total) if data.sinta_score_total.isdigit() else None,
+                affil_score_3yr=int(data.affil_score_3yr) if data.affil_score_3yr.isdigit() else None,
+                affil_score_total=int(data.affil_score_total) if data.affil_score_total.isdigit() else None,
+            )
+            db.add(author)
 
     db.commit()
