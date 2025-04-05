@@ -53,27 +53,45 @@ def scrape_sinta():
     return results
 
 
-def save_scraped_data(scraped_data: list[CrawlAuthors], db: Session):
-    for data in scraped_data:
-        # Cek apakah user sudah ada di database berdasarkan nama
-        user = db.query(User).filter(User.name == data.lecturer_name).first()
+def get_or_create_user(db: Session, name: str):
+    """Cek apakah user sudah ada, jika tidak buat baru"""
+    user = db.query(User).filter(User.name == name).first()
+    if not user:
+        user = User(name=name)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
 
-        if not user:
-            # Jika belum ada, buat user baru
-            user = User(name=data.lecturer_name)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+def safe_int(value):
+    """Coba konversi ke integer, return None jika tidak bisa"""
+    try:
+        return int(value) if value and value.isdigit() else None
+    except ValueError:
+        return None
+
+def save_scraped_data(scraped_data: list, db: Session):
+    """Simpan hasil scraping ke database dengan relasi user"""
+    for data in scraped_data:
+        # Cek atau buat user baru
+        user = get_or_create_user(db, data.lecturer_name)
+
+        # Cek apakah author dengan user_id ini sudah ada
+        existing_author = db.query(Author).filter(Author.user_id == user.id).first()
+        if existing_author:
+            print(f"Data untuk user {user.name} sudah ada, dilewati.")
+            continue
 
         # Simpan data ke tabel Authors
         author = Author(
             user_id=user.id,  # Hubungkan dengan user yang baru dibuat
             sinta_profile_url=str(data.sinta_profile_url),
-            sinta_score_3yr=int(data.sinta_score_3yr) if data.sinta_score_3yr.isdigit() else None,
-            sinta_score_total=int(data.sinta_score_total) if data.sinta_score_total.isdigit() else None,
-            affil_score_3yr=int(data.affil_score_3yr) if data.affil_score_3yr.isdigit() else None,
-            affil_score_total=int(data.affil_score_total) if data.affil_score_total.isdigit() else None,
+            sinta_score_3yr=safe_int(data.sinta_score_3yr),
+            sinta_score_total=safe_int(data.sinta_score_total),
+            affil_score_3yr=safe_int(data.affil_score_3yr),
+            affil_score_total=safe_int(data.affil_score_total),
         )
         db.add(author)
-
-    db.commit()
+    
+    db.commit()  # Commit semua perubahan setelah loop selesai
+    print("Data scraping berhasil disimpan.")

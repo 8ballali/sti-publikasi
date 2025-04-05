@@ -34,6 +34,7 @@ class Article(Base):
     citation_count = Column(Integer, nullable=True)
     article_url = Column(Text)
     journal = Column(String(255))
+    source = Column(String(255))
     authors = relationship("PublicationAuthor", back_populates="article")
     keywords = relationship("ArticleKeyword", back_populates="article")
 
