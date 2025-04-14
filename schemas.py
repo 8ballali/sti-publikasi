@@ -35,5 +35,16 @@ class PaperResponse(BaseModel):
     doi: Optional[str] = None
     accred: Optional[str] = None
 
+class PaperResponseScholar(BaseModel):
+    lecturer_name: str
+    title: str
+    publication_link: str
+    journal_category: str
+    author_order: str
+    authors: List[str]
+    year: str
+
+
+
     class Config:
         orm_mode = True

@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session
 from database import get_db
 from repository.author_crawl import scrape_sinta, save_scraped_data
-
+from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data
 from models import User, Author
 from schemas import PaperResponse
 from typing import List
@@ -33,7 +33,7 @@ async def scrape_garuda(db: Session = Depends(get_db)):
         if profile_link:
             print(f"Memproses dosen: {lecturer_name}")  # Debugging
             
-            # 🔹 Pastikan memanggil `scrape_garuda_data()` dengan argumen yang benar
+            
             scraped_data = garuda_scrapping(lecturer_name, profile_link)
             
             print(f"Scraped data untuk {lecturer_name}: {scraped_data}")
@@ -71,25 +71,24 @@ async def sync_garuda(db: Session = Depends(get_db)):
 
     return {"message": "Sync Data selesai, Data Telah Diperbarui!"}
 
+@router.get("/scrape/scholar")
+async def scrape_scholar(db: Session = Depends(get_db)):
+    results = []
 
-# @router.get("/test/scrape/garuda", response_model=List[PaperResponse])
-# async def scrape_garuda_route(db: Session = Depends(get_db)):
-#     results = []
+    # Mengambil data dosen dari database
+    lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
+    print(f"Jumlah dosen: {len(lecturers)}")
 
-#     # Mengambil data dosen dari database
-#     lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
-#     print(f"Lecturers data: {lecturers}")  # Cek apakah ada data tambahan yang tidak diharapkan
+    for lecturer_name, profile_link in lecturers:
+        if profile_link:
+            print(f"Memproses dosen: {lecturer_name}")
 
+            scraped_data = scholar_scrapping(lecturer_name, profile_link)
+            print(f"Jumlah data yang di-scrape: {len(scraped_data)}")
 
-#     print(f"Jumlah dosen: {len(lecturers)}")  # Debugging
+            scholar_data(scraped_data, db)
 
-#     for lecturer_name, profile_link in lecturers:
-#         if profile_link:
-#             print(f"Memproses dosen: {lecturer_name}")  # Debugging
-#             scraped_data_garuda = garuda_scrapping(lecturer_name, profile_link)  # Scraping
-#             print(f"Scraped data untuk {lecturer_name}: {scraped_data_garuda}")
-#             print(f"Jumlah data yang di-scrape: {len(scraped_data_garuda)}")  # Debugging
-#             # save_scraped_data(scraped_data_garuda, db)  # Simpan hasil scraping ke database
-#             results.extend(scraped_data_garuda)
+            results.extend(scraped_data)
 
-#     return results
+    return {"message": "Scraping Scholar selesai dan data telah disimpan ke database!"}
+
