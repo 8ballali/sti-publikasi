@@ -40,10 +40,9 @@ class PaperResponseScholar(BaseModel):
     title: str
     publication_link: str
     journal_category: str
-    author_order: str
+    author_order: Optional[int]
     authors: List[str]
     year: str
-
 
 
     class Config:

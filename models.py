@@ -62,7 +62,7 @@ class PublicationAuthor(Base):
     id = Column(Integer, primary_key=True, index=True)
     article_id = Column(Integer, ForeignKey("articles.id"))
     author_id = Column(Integer, ForeignKey("authors.id"))
-    author_order = Column(Integer, default=0)
+    author_order = Column(Integer, nullable=True)
     article = relationship("Article", back_populates="authors")
     author = relationship("Author", back_populates="publications")
 

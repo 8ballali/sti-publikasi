@@ -30,14 +30,25 @@ def scholar_scrapping(lecturer_name: str, profile_link: str) -> List[PaperRespon
         title = link_tag.text.strip() if link_tag else 'N/A'
         publication_link = link_tag['href'] if link_tag and link_tag.has_attr('href') else 'N/A'
 
-        # Authors
-        meta_divs = item.find_all('div', class_='ar-meta')
         authors = []
-        if meta_divs:
-            first_meta = meta_divs[0].get_text(strip=True)
-            if 'Authors:' in first_meta:
-                author_text = first_meta.split('Authors:')[-1]
-                authors = [a.strip() for a in author_text.split(',') if a.strip()]
+        author_order = None
+        meta_divs = item.find_all('div', class_='ar-meta')
+
+        for div in meta_divs:
+            author_tag = div.find('a', href='#!')
+            if author_tag and "Authors :" in author_tag.text:
+                author_text = author_tag.text.strip()
+                authors_part = author_text.split("Authors :")[-1]
+                authors = [a.strip() for a in authors_part.split(',') if a.strip() and "..." not in a]
+
+                # Normalisasi nama dosen → pecah jadi keyword (e.g. ['ajib', 'susanto'])
+                lecturer_keywords = lecturer_name.lower().split()
+
+                for idx, name in enumerate(authors):
+                    if any(key in name.lower() for key in lecturer_keywords if len(key) > 2):
+                        author_order = idx + 1
+                        break
+                break  # keluar kalau sudah nemu authors
 
         # Journal
         journal_category_tag = item.find('a', class_='ar-pub')
@@ -62,13 +73,14 @@ def scholar_scrapping(lecturer_name: str, profile_link: str) -> List[PaperRespon
             title=title,
             publication_link=publication_link,
             journal_category=journal_category,
-            author_order='1',  # default: dosen sebagai author pertama
+            author_order=author_order,
             authors=authors,
             year=year,
             cited=cited
         ))
 
     return papers
+
 
 
 
@@ -104,7 +116,7 @@ def scholar_data(scraped_data: list[PaperResponseScholar], db: Session):
                 new_relation = PublicationAuthor(
                     article_id=article.id,
                     author_id=author_id,
-                    author_order=int(data.author_order) if data.author_order.isdigit() else 0
+                    author_order=data.author_order
                 )
                 db.add(new_relation)
     db.commit()
