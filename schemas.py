@@ -44,6 +44,15 @@ class PaperResponseScholar(BaseModel):
     authors: List[str]
     year: str
 
+class PaperResponseScopus(BaseModel):
+    lecturer_name: str
+    title: str
+    accred: Optional[str] = None
+    jurnal: Optional[str] = None
+    author_order: Optional[int] = None
+    creator: Optional[str] = None
+    year: Optional[int] = None
+    cited: Optional[int] = 0
 
     class Config:
         orm_mode = True
