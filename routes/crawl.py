@@ -3,15 +3,17 @@ from sqlalchemy.orm import Session
 from database import get_db
 from repository.author_crawl import scrape_sinta, save_scraped_data
 from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data, scholar_sync
-from models import User, Author
-from schemas import PaperResponse
+from models import User, Author, Article
+from schemas import GarudaAbstractResponse
 from typing import List
-from repository.garuda_abstract_crawl import garuda_data,garuda_scrapping, garuda_sync
+from repository.garuda_abstract_crawl import garuda_data,garuda_scrapping, garuda_sync, garuda_abstract_scraping
 from repository.scopus_abstract_crawl import scopus_scrapping,scopus_data, scopus_sync
 from fastapi.encoders import jsonable_encoder
 from bs4 import BeautifulSoup
-import requests
+import requests, time
 import re
+from sqlalchemy.exc import SQLAlchemyError
+
 
 
 router = APIRouter()
@@ -369,4 +371,89 @@ async def scrape_scopus_debug(db: Session = Depends(get_db)):
                 continue
 
     return {"scraped_results": results}
+
+@router.get("/scrape/abstract/garuda")
+async def scrape_and_save_garuda_abstract(db: Session = Depends(get_db)):
+    results = []
+
+    articles = db.query(Article.id, Article.title, Article.article_url).filter(
+        Article.source == "GARUDA",
+        Article.abstract == None
+    ).all()
+
+    print(f"🔍 Jumlah artikel GARUDA tanpa abstract: {len(articles)}")
+
+    scraped_data: List[GarudaAbstractResponse] = garuda_abstract_scraping(articles)
+
+    print(f"💾 Mulai menyimpan {len(scraped_data)} abstract ke database...")
+
+    for data in scraped_data:
+        try:
+            article = db.query(Article).filter_by(id=data.article_id).first()
+            if article:
+                article.abstract = data.abstract
+                db.add(article)
+                db.commit()
+                results.append({
+                    "id": article.id,
+                    "title": article.title,
+                    "abstract": article.abstract
+                })
+        except SQLAlchemyError as e:
+            db.rollback()
+            print(f"❌ Gagal simpan ID {data.article_id}: {str(e)}")
+
+    return {
+        "message": "Scraping GARUDA selesai dan abstract disimpan ke database!",
+        "total_saved": len(results),
+        "saved_data": results
+    }
+
+@router.get("/scrape/abstract/garuda/debug")
+async def scrape_abstract_garuda_debug(db: Session = Depends(get_db)):
+    # Ambil hanya artikel dari GARUDA yang abstract-nya masih kosong
+    articles = db.query(Article).filter(
+        Article.source == "GARUDA",
+        Article.abstract == None
+    ).all()
+
+    print(f"📄 Total artikel GARUDA tanpa abstract: {len(articles)}")
+
+    results = []
+
+    for idx, article in enumerate(articles, start=1):
+        title = article.title
+        url = article.article_url
+        abstract_text = "N/A"
+
+        print(f"\n[{idx}/{len(articles)}] 🔍 Memproses: {title}")
+        print(f"🌐 URL: {url}")
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            abstract_div = soup.find("div", class_="abstract-article")
+
+            if abstract_div:
+                abstract_xmp = abstract_div.find("xmp", class_="abstract-article")
+                abstract_text = abstract_xmp.text.strip() if abstract_xmp else "N/A"
+                print(f"✅ Abstract ditemukan: {abstract_text[:50]}...")
+            else:
+                print("⚠️ Tidak menemukan div.abstract-article")
+
+        except Exception as e:
+            abstract_text = f"❌ Error: {str(e)}"
+            print(f"❌ Gagal scraping: {str(e)}")
+
+        results.append({
+            "title": title,
+            "article_url": url,
+            "abstract": abstract_text
+        })
+
+        time.sleep(1)  # Biar nggak diblokir
+
+    return {"scraped_abstracts": results}
 

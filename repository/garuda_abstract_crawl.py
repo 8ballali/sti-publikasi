@@ -1,9 +1,9 @@
 import requests
 from fastapi import HTTPException
 from bs4 import BeautifulSoup
-import re
+import re, time
 from typing import List
-from schemas import PaperResponse
+from schemas import PaperResponse, GarudaAbstractResponse
 from sqlalchemy.orm import Session
 from models import Article, User, Author, PublicationAuthor
 
@@ -161,3 +161,41 @@ def garuda_sync(lecturer_name: str, profile_link: str):
             ))
 
     return papers
+
+def garuda_abstract_scraping(article_list: List[tuple]) -> List[GarudaAbstractResponse]:
+    results = []
+
+    for idx, (article_id, title, url) in enumerate(article_list, start=1):
+        print(f"\n[{idx}] 🔍 Scraping: {title}")
+        print(f"🌐 URL: {url}")
+
+        abstract_text = "N/A"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            abstract_div = soup.find("div", class_="abstract-article")
+
+            if abstract_div:
+                xmp = abstract_div.find("xmp", class_="abstract-article")
+                abstract_text = xmp.text.strip() if xmp else "N/A"
+                print("✅ Abstract ditemukan")
+            else:
+                print("⚠️ Abstract tidak ditemukan")
+
+        except Exception as e:
+            print(f"❌ Gagal scraping: {str(e)}")
+            continue
+
+        results.append(GarudaAbstractResponse(
+            article_id=article_id,
+            title=title,
+            article_url=url,
+            abstract=abstract_text
+        ))
+
+        time.sleep(1)  # untuk hindari rate-limit
+
+    return results
+

@@ -54,5 +54,11 @@ class PaperResponseScopus(BaseModel):
     year: Optional[int] = None
     cited: Optional[int] = 0
 
+class GarudaAbstractResponse(BaseModel):
+    article_id: int
+    title: str
+    article_url: str
+    abstract: str
+
     class Config:
         orm_mode = True
