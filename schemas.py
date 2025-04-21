@@ -60,5 +60,16 @@ class GarudaAbstractResponse(BaseModel):
     article_url: str
     abstract: str
 
+class ResearchResponse(BaseModel):
+    title: str
+    leader: str
+    jenis_penelitian: str
+    personils: Optional[str]
+    year: Optional[str]
+    dana_penelitian: str
+    status_penelitian: str
+    sumber_pendanaan: str
+
+
     class Config:
         orm_mode = True
