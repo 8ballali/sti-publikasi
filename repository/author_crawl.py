@@ -63,13 +63,6 @@ def get_or_create_user(db: Session, name: str):
         db.refresh(user)
     return user
 
-def safe_int(value):
-    """Coba konversi ke integer, return None jika tidak bisa"""
-    try:
-        return int(value) if value and value.isdigit() else None
-    except ValueError:
-        return None
-
 def save_scraped_data(scraped_data: list, db: Session):
     """Simpan hasil scraping ke database dengan relasi user"""
     for data in scraped_data:
@@ -86,10 +79,10 @@ def save_scraped_data(scraped_data: list, db: Session):
         author = Author(
             user_id=user.id,  # Hubungkan dengan user yang baru dibuat
             sinta_profile_url=str(data.sinta_profile_url),
-            sinta_score_3yr=safe_int(data.sinta_score_3yr),
-            sinta_score_total=safe_int(data.sinta_score_total),
-            affil_score_3yr=safe_int(data.affil_score_3yr),
-            affil_score_total=safe_int(data.affil_score_total),
+            sinta_score_3yr=str(data.sinta_score_3yr),
+            sinta_score_total=str(data.sinta_score_total),
+            affil_score_3yr=str(data.affil_score_3yr),
+            affil_score_total=str(data.affil_score_total),
         )
         db.add(author)
     

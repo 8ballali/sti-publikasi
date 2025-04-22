@@ -14,8 +14,6 @@ import requests, time
 import re
 from sqlalchemy.exc import SQLAlchemyError
 
-
-
 router = APIRouter()
 
 router = APIRouter(
@@ -528,7 +526,7 @@ async def scrape_research_sinta_debug(db: Session = Depends(get_db)):
                     "Personils": personils,
                     "Year": year,
                     "Dana Penelitian": dana_penelitian,
-                    "Status Penelitian": status_penelitian,
+                    "Status Pendanaan": status_penelitian,
                     "Sumber Pendanaan": sumber_pendanaan
                 }
 
@@ -542,4 +540,23 @@ async def scrape_research_sinta_debug(db: Session = Depends(get_db)):
 
     return {"scraped_researches": results}
 
+@router.get("/scrape/researches")
+async def scrape_researches(db: Session = Depends(get_db)):
+    results = []
 
+    # Mengambil data dosen dari database
+    lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
+    print(f"Jumlah dosen: {len(lecturers)}")
+
+    for lecturer_name, profile_link in lecturers:
+        if profile_link:
+            print(f"Memproses dosen: {lecturer_name}")
+
+            scraped_data = scholar_scrapping(lecturer_name, profile_link)
+            print(f"Jumlah data yang di-scrape: {len(scraped_data)}")
+
+            scholar_data(scraped_data, db)
+
+            results.extend(scraped_data)
+
+    return {"message": "Scraping Scholar selesai dan data telah disimpan ke database!"}
