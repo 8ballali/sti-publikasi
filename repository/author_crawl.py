@@ -88,3 +88,23 @@ def save_scraped_data(scraped_data: list, db: Session):
     
     db.commit()  # Commit semua perubahan setelah loop selesai
     print("Data scraping berhasil disimpan.")
+
+
+def scrape_subjects_from_profile(profile_url: str):
+    if not profile_url:
+        return []
+
+    # Cek apakah url sudah lengkap
+    if not profile_url.startswith("http"):
+        profile_url = "https://sinta.kemdikbud.go.id" + profile_url
+
+    response = requests.get(profile_url, headers=HEADERS)
+
+    subjects = []
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, "html.parser")
+        subject_list_div = soup.find("div", class_="profile-subject mt-3")
+        if subject_list_div:
+            subjects = [a.get_text(strip=True) for a in subject_list_div.find_all("a")]
+
+    return subjects

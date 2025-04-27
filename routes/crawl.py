@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session
 from database import get_db
-from repository.author_crawl import scrape_sinta, save_scraped_data
+from repository.author_crawl import scrape_sinta, save_scraped_data, scrape_subjects_from_profile
 from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data, scholar_sync
 from models import User, Author, Article
 from schemas import GarudaAbstractResponse
@@ -161,6 +161,30 @@ async def sync_scholar(db: Session = Depends(get_db)):
 
     return {"message": "Sync Data Article Google Scholar Selesai"}
 
+@router.get("/scrape/subjects/debug")
+async def scrape_subjects_debug(db: Session = Depends(get_db)):
+    # Ambil semua author dari database
+    authors = db.query(Author).all()
+
+    results = []
+    for author in authors:
+        user = db.query(User).filter(User.id == author.user_id).first()
+        lecturer_name = user.name if user else "N/A"
+
+        subjects = scrape_subjects_from_profile(author.sinta_profile_url)
+
+        results.append({
+            "lecturer_name": lecturer_name,
+            "sinta_profile_url": author.sinta_profile_url,
+            "sinta_score_3yr": author.sinta_score_3yr,
+            "sinta_score_total": author.sinta_score_total,
+            "affil_score_3yr": author.affil_score_3yr,
+            "affil_score_total": author.affil_score_total,
+            "subjects": subjects  
+        })
+
+    return {"scraped_results": results}
+
 @router.get("/scrape/scholar/debug")
 async def scrape_scholar_debug(db: Session = Depends(get_db)):
     results = []
@@ -282,6 +306,27 @@ async def scrape_garuda_debug(db: Session = Depends(get_db)):
                 })
 
     return {"scraped_results": results}
+
+@router.get("/scrape/authors/debug")
+async def scrape_authors_debug():
+    scraped_data = scrape_sinta()
+
+    # Ubah hasil scraping ke bentuk dictionary agar bisa dikembalikan dalam JSON
+    debug_results = []
+    for data in scraped_data:
+        debug_results.append({
+            "lecturer_name": data.lecturer_name,
+            "sinta_profile_url": data.sinta_profile_url,
+            "sinta_id": data.sinta_id,
+            "profile_link": data.profile_link,
+            "sinta_score_3yr": data.sinta_score_3yr,
+            "sinta_score_total": data.sinta_score_total,
+            "affil_score_3yr": data.affil_score_3yr,
+            "affil_score_total": data.affil_score_total
+        })
+
+    return {"scraped_results": debug_results}
+
 
 @router.get("/scrape/scopus/debug")
 async def scrape_scopus_debug(db: Session = Depends(get_db)):

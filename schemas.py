@@ -11,6 +11,7 @@ class CrawlAuthors(BaseModel):
     affil_score_3yr: str
     affil_score_total: str
 
+
 class UserCreate(BaseModel):
     name: str
 
@@ -21,6 +22,7 @@ class AuthorCreate(BaseModel):
     sinta_score_total: Optional[int] = None
     affil_score_3yr: Optional[int] = None
     affil_score_total: Optional[int] = None
+    subject: List[str] = [] 
 
 
 

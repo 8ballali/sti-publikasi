@@ -8,7 +8,6 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=True)
     author = relationship("Author", back_populates="user", uselist=False)
-    subjects = relationship("UserSubject", back_populates="user")
 
 class Author(Base):
     __tablename__ = "authors"
@@ -19,10 +18,12 @@ class Author(Base):
     sinta_score_total = Column(String(255), nullable=True)
     affil_score_3yr = Column(String(255), nullable=True)
     affil_score_total = Column(String(255), nullable=True)
+
     user = relationship("User", back_populates="author")
     publications = relationship("PublicationAuthor", back_populates="author")
     research = relationship("ResearcherAuthor", back_populates="author")
-    subject = relationship("Subject", back_populates="subject")
+    subjects = relationship("UserSubject", back_populates="author")
+
 
 class Article(Base):
     __tablename__ = "articles"
@@ -44,16 +45,18 @@ class Subject(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=True)
 
-    users = relationship("UserSubject", back_populates="subject")
+    authors = relationship("UserSubject", back_populates="subject")
 
 class UserSubject(Base):
     __tablename__ = "user_subjects"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+
+    author_id = Column(Integer, ForeignKey("authors.id"))
     subject_id = Column(Integer, ForeignKey("subjects.id"))
 
-    user = relationship("User", back_populates="subjects")
-    subject = relationship("Subject", back_populates="users")
+    author = relationship("Author", back_populates="subjects")
+    subject = relationship("Subject", back_populates="authors")
+
 
 
 class Research(Base):
