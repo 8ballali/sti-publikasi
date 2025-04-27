@@ -58,7 +58,6 @@ class UserSubject(Base):
     subject = relationship("Subject", back_populates="authors")
 
 
-
 class Research(Base):
     __tablename__ = "research"
     id = Column(Integer, primary_key=True, index=True)

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from repository.author_crawl import scrape_sinta, save_scraped_data, scrape_subjects_from_profile
 from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data, scholar_sync
-from models import User, Author, Article
+from models import User, Author, Article, Subject, UserSubject
 from schemas import GarudaAbstractResponse
 from typing import List
 from repository.garuda_abstract_crawl import garuda_data,garuda_scrapping, garuda_sync, garuda_abstract_scraping
@@ -173,6 +173,26 @@ async def scrape_subjects_debug(db: Session = Depends(get_db)):
 
         subjects = scrape_subjects_from_profile(author.sinta_profile_url)
 
+        for subject_name in subjects:
+            # Cek apakah subject sudah ada
+            subject = db.query(Subject).filter(Subject.name == subject_name).first()
+            if not subject:
+                # Kalau belum ada, buat baru
+                subject = Subject(name=subject_name)
+                db.add(subject)
+                db.commit()
+                db.refresh(subject)
+
+            # Cek apakah relasi author-subject sudah ada
+            user_subject = db.query(UserSubject).filter_by(
+                author_id=author.id, subject_id=subject.id
+            ).first()
+            if not user_subject:
+                # Kalau belum ada, buat baru
+                user_subject = UserSubject(author_id=author.id, subject_id=subject.id)
+                db.add(user_subject)
+                db.commit()
+
         results.append({
             "lecturer_name": lecturer_name,
             "sinta_profile_url": author.sinta_profile_url,
@@ -184,6 +204,7 @@ async def scrape_subjects_debug(db: Session = Depends(get_db)):
         })
 
     return {"scraped_results": results}
+
 
 @router.get("/scrape/scholar/debug")
 async def scrape_scholar_debug(db: Session = Depends(get_db)):
