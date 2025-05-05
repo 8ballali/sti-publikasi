@@ -9,6 +9,11 @@ from typing import List
 from bs4 import BeautifulSoup
 import requests
 
+from typing import List
+import requests
+from bs4 import BeautifulSoup
+
+
 def scholar_scrapping(lecturer_name: str, profile_link: str) -> List[PaperResponseScholar]:
     google_scholar_url = f"{profile_link}?view=google_scholar"
     print(f'Fetching data from: {google_scholar_url}')
@@ -80,6 +85,7 @@ def scholar_scrapping(lecturer_name: str, profile_link: str) -> List[PaperRespon
         ))
 
     return papers
+
 
 
 def scholar_data(scraped_data: list[PaperResponseScholar], db: Session):

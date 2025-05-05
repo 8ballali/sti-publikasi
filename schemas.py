@@ -75,3 +75,15 @@ class ResearchResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ArticleResponse(BaseModel):
+    id: int
+    title: str
+    year: Optional[int]
+    article_url: Optional[str]
+    journal: Optional[str]
+    source: Optional[str]
+    author_order: Optional[int]
+
+    class Config:
+        orm_mode = True

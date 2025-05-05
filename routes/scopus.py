@@ -1,11 +1,22 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, Author
+from models import User, Author, Article
 from repository.scopus_abstract_crawl import scopus_scrapping,scopus_data, scopus_sync
-from bs4 import BeautifulSoup
-import requests
-import re
+import pandas as pd
+from io import StringIO
+from difflib import get_close_matches
+import requests,time
+import re, random
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
+from fake_useragent import UserAgent
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
 
@@ -60,89 +71,110 @@ async def sync_scopus(db: Session = Depends(get_db)):
     return {"message": "Scraping Scopus selesai dan data telah disimpan ke database!"}
 
 
-@router.get("/scrape/scopus/debug")
-async def scrape_scopus_debug(db: Session = Depends(get_db)):
-    results = []
+def scrape_abstract_google_scholar(articles):
+    # Set up Chrome with undetected_chromedriver
+    options = Options()
+    ua = UserAgent()
+    options.add_argument(f"user-agent={ua.random}")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    # options.add_argument("--headless")
 
-    lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
-    print(f"Jumlah dosen ditemukan: {len(lecturers)}")
+    # Start Chrome
+    driver = uc.Chrome(options=options)
+    driver.get("https://scholar.google.com")
+    
+    # Results to store
+    scraped_data = []
 
-    for lecturer_name, profile_link in lecturers:
-        if not profile_link:
-            continue
-
-        scopus_url = f"{profile_link}?view=scopus"
-        print(f"\n📚 Memproses (SCOPUS): {lecturer_name}")
-        print(f"🔗 Fetching from: {scopus_url}")
-
+    for article in articles:
         try:
-            response = requests.get(scopus_url, timeout=10)
-        except Exception as e:
-            print(f"❌ Error saat mengambil halaman: {e}")
-            continue
+            title = article.title
+            print(f"🔍 Searching for: {title}")
 
-        if response.status_code != 200:
-            print(f"❌ Gagal mengambil data dari {scopus_url}")
-            continue
+            # Search the article title on Google Scholar
+            search_box = driver.find_element(By.NAME, "q")
+            search_box.clear()
+            search_box.send_keys(title)
+            search_box.send_keys(Keys.RETURN)
+            time.sleep(random.randint(4,6))  # Sleep to mimic human behavior
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-        articles = soup.find_all('div', class_='ar-list-item mb-5')
+            abstract = "Not Found"
+            article_link = "Not Found"
 
-        for item in articles:
             try:
-                # Judul publikasi
-                title_tag = item.find('div', class_='ar-title').find('a')
-                title = title_tag.text.strip() if title_tag else 'N/A'
+                result_element = driver.find_element(By.CLASS_NAME, "gs_ri")
 
-                # Akreditasi
-                accred_tag = item.find('div', class_='ar-meta').find('a', href='#!')
-                accred = accred_tag.text.strip() if accred_tag else 'N/A'
+                # Ambil link artikel dari class gs_rt
+                try:
+                    article_element = result_element.find_element(By.CLASS_NAME, "gs_rt").find_element(By.TAG_NAME, "a")
+                    article_link = article_element.get_attribute("href")
+                except:
+                    pass  
 
-                # Nama jurnal
-                jurnal_tag = item.find('div', class_='ar-meta').find('a', class_='ar-pub')
-                jurnal = jurnal_tag.text.strip() if jurnal_tag else 'N/A'
-
-                # Meta pertama
-                first_meta_div = item.find('div', class_='ar-meta')
-
-                # Author Order
-                author_order_tag = first_meta_div.find('a', href="#!", text=lambda t: t and "Author Order" in t)
-                if author_order_tag:
-                    author_order_text = author_order_tag.text.replace('Author Order : ', '').strip()
-                    match = re.match(r"(\d+)", author_order_text)
-                    author_order = int(match.group(1)) if match else None
-                else:
-                    author_order = None
-
-                # Creator
-                creator_tag = first_meta_div.find('a', href="#!", text=lambda t: t and "Creator" in t)
-                creator = creator_tag.text.replace('Creator : ', '').strip() if creator_tag else 'N/A'
-
-                # Meta kedua
-                all_meta_divs = item.find_all('div', class_='ar-meta')
-                second_meta_div = all_meta_divs[1] if len(all_meta_divs) > 1 else None
-
-                year = cited = 'N/A'
-                if second_meta_div:
-                    year_tag = second_meta_div.find('a', class_='ar-year')
-                    year = year_tag.text.strip() if year_tag else 'N/A'
-
-                    cited_tag = second_meta_div.find('a', class_='ar-cited')
-                    cited = cited_tag.text.strip() if cited_tag else '0'
-
-                results.append({
-                    "user": lecturer_name,
-                    "title": title,
-                    "accred": accred,
-                    "jurnal": jurnal,
-                    "author_order": author_order,
-                    "creator": creator,
-                    "year": year,
-                    "cited": cited,
-                })
+                # Cari abstrak di berbagai kemungkinan class
+                try:
+                    abstract_element = result_element.find_element(By.CLASS_NAME, "gs_fma_snp")
+                    abstract = abstract_element.text.strip()
+                except:
+                    try:
+                        abstract_element = result_element.find_element(By.CLASS_NAME, "gsh_csp")
+                        abstract = abstract_element.text.strip()
+                    except:
+                        try:
+                            abstract_element = result_element.find_element(By.CLASS_NAME, "gs_rs")
+                            abstract = abstract_element.text.strip()
+                        except:
+                            pass  
 
             except Exception as e:
-                print(f"⚠️ Gagal memproses satu publikasi: {e}")
-                continue
+                print(f"Error retrieving data: {e}")
 
-    return {"scraped_results": results}
+            # Append the data to scraped_data
+            scraped_data.append({
+                "article_id": article.id,
+                "title": article.title,
+                "abstract": abstract,
+                "article_link": article_link
+            })
+
+        except Exception as e:
+            print(f"Error scraping article {article.title}: {str(e)}")
+
+    driver.quit()
+    return scraped_data
+
+@router.get("/scrape/abstract/google-scholar")
+async def abstract_google_scholar(db: Session = Depends(get_db)):
+    results = []
+
+    # Ambil artikel yang belum memiliki abstrak dari database (hanya 10 artikel untuk testing)
+    articles = db.query(Article.id, Article.title).filter(Article.abstract == None).limit(10).all()
+
+    print(f"🔍 Jumlah artikel tanpa abstrak: {len(articles)}")
+
+    if not articles:
+        raise HTTPException(status_code=404, detail="No articles found to scrape")
+
+    # Scraping abstract menggunakan fungsi scrape_abstract_google_scholar
+    scraped_data = scrape_abstract_google_scholar(articles)
+
+    print(f"💾 Menampilkan {len(scraped_data)} abstrak yang ditemukan:")
+
+    # Kumpulkan hasil scraping tanpa menyimpan ke database
+    for data in scraped_data:
+        results.append({
+            "id": data['article_id'],
+            "title": data['title'],
+            "abstract": data['abstract'],
+            "article_link": data['article_link']
+        })
+
+    return {
+        "message": "Scraping selesai!",
+        "scraped_data": results
+    }
+
+
+

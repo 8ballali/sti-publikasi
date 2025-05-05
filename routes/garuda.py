@@ -106,54 +106,6 @@ async def sync_garuda(db: Session = Depends(get_db)):
     return {"message": "Sync Data selesai, Data Telah Diperbarui!"}
 
 
-@router.get("/scrape/abstract/garuda/debug")
-async def scrape_abstract_garuda_debug(db: Session = Depends(get_db)):
-    # Ambil hanya artikel dari GARUDA yang abstract-nya masih kosong
-    articles = db.query(Article).filter(
-        Article.source == "GARUDA",
-        Article.abstract == None
-    ).all()
-
-    print(f"📄 Total artikel GARUDA tanpa abstract: {len(articles)}")
-
-    results = []
-
-    for idx, article in enumerate(articles, start=1):
-        title = article.title
-        url = article.article_url
-        abstract_text = "N/A"
-
-        print(f"\n[{idx}/{len(articles)}] 🔍 Memproses: {title}")
-        print(f"🌐 URL: {url}")
-
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            abstract_div = soup.find("div", class_="abstract-article")
-
-            if abstract_div:
-                abstract_xmp = abstract_div.find("xmp", class_="abstract-article")
-                abstract_text = abstract_xmp.text.strip() if abstract_xmp else "N/A"
-                print(f"✅ Abstract ditemukan: {abstract_text[:50]}...")
-            else:
-                print("⚠️ Tidak menemukan div.abstract-article")
-
-        except Exception as e:
-            abstract_text = f"❌ Error: {str(e)}"
-            print(f"❌ Gagal scraping: {str(e)}")
-
-        results.append({
-            "title": title,
-            "article_url": url,
-            "abstract": abstract_text
-        })
-
-        time.sleep(1)  # Biar nggak diblokir
-
-    return {"scraped_abstracts": results}
-
 @router.get("/scrape/garuda/debug")
 async def garuda_debug(db: Session = Depends(get_db)):
     results = []
@@ -220,3 +172,5 @@ async def garuda_debug(db: Session = Depends(get_db)):
                 })
 
     return {"scraped_results": results}
+
+
