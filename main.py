@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 from database import engine
 import models
-from routes import authors,garuda,scholar,scopus, database
+from routes import authors,garuda,scholar,scopus, database, searching
 
 from sqlalchemy.orm import Session
 # Buat instance FastAPI
@@ -19,5 +19,6 @@ app.include_router(garuda.router, prefix="/api")
 app.include_router(scholar.router,prefix="/api")
 app.include_router(scopus.router, prefix="/api")
 app.include_router(database.router, prefix="/api")
+app.include_router(searching.router, prefix="/api")
 
 

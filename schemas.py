@@ -76,6 +76,12 @@ class ResearchResponse(BaseModel):
     class Config:
         orm_mode = True
 
+
+class ArticleAuthorItem(BaseModel):
+    name: str
+    author_order: Optional[int]
+
+
 class ArticleResponse(BaseModel):
     id: int
     title: str
@@ -87,3 +93,29 @@ class ArticleResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ArticleWithAuthorsResponse(BaseModel):
+    id: int
+    title: str
+    year: Optional[int]
+    doi: Optional[str]
+    accred: Optional[str] = None
+    citation_count: Optional[int] = None
+    article_url: Optional[str] = None
+    journal: Optional[str] = None
+    source: Optional[str] = None
+    authors: List[ArticleAuthorItem]
+
+
+class SubjectItem(BaseModel):
+    name: Optional[str]
+
+class AuthorDetailResponse(BaseModel):
+    id: int
+    name: Optional[str]  # from User
+    sinta_profile_url: Optional[str]
+    sinta_score_3yr: Optional[str]
+    sinta_score_total: Optional[str]
+    affil_score_3yr: Optional[str]
+    affil_score_total: Optional[str]
+    subjects: List[SubjectItem]
