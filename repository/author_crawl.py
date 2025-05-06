@@ -26,9 +26,16 @@ def scrape_sinta():
                 name_tag = author.find("a")
                 name = name_tag.get_text(strip=True) if name_tag else "N/A"
                 profile_link = name_tag["href"] if name_tag else "N/A"
-
                 sinta_id_tag = author.find("div", class_="profile-id")
                 sinta_id = sinta_id_tag.get_text(strip=True).replace("ID : ", "") if sinta_id_tag else "N/A"
+
+                # Ambil Scopus H-Index
+                scopus_hindex_tag = author.find("span", class_="profile-id text-warning")
+                scopus_hindex = scopus_hindex_tag.get_text(strip=True).replace("Scopus H-Index : ", "") if scopus_hindex_tag else "0"
+
+                # Ambil GS H-Index
+                gs_hindex_tag = author.find("span", class_="profile-id text-success ml-3")
+                gs_hindex = gs_hindex_tag.get_text(strip=True).replace("GS H-Index : ", "") if gs_hindex_tag else "0"
 
                 score_blocks = author.find_all("div", class_="stat-num text-center")
                 sinta_score_3yr = score_blocks[0].get_text(strip=True) if len(score_blocks) >= 2 else "0"
@@ -42,6 +49,8 @@ def scrape_sinta():
                         sinta_profile_url=profile_link,
                         sinta_id=sinta_id,
                         profile_link=profile_link,
+                        scopus_hindex=scopus_hindex,
+                        gs_hindex=gs_hindex,
                         sinta_score_3yr=sinta_score_3yr,
                         sinta_score_total=sinta_score_total,
                         affil_score_3yr=affil_score_3yr,
@@ -51,7 +60,6 @@ def scrape_sinta():
                 time.sleep(1)
 
     return results
-
 
 def get_or_create_user(db: Session, name: str):
     """Cek apakah user sudah ada, jika tidak buat baru"""
@@ -79,6 +87,9 @@ def save_scraped_data(scraped_data: list, db: Session):
         author = Author(
             user_id=user.id,  # Hubungkan dengan user yang baru dibuat
             sinta_profile_url=str(data.sinta_profile_url),
+            sinta_id=str(data.sinta_id),
+            scopus_hindex=str(data.scopus_hindex),
+            gs_hindex=str(data.gs_hindex),
             sinta_score_3yr=str(data.sinta_score_3yr),
             sinta_score_total=str(data.sinta_score_total),
             affil_score_3yr=str(data.affil_score_3yr),

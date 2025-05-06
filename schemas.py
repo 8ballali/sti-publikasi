@@ -6,6 +6,8 @@ class CrawlAuthors(BaseModel):
     sinta_profile_url: str
     sinta_id: str
     profile_link: str
+    scopus_hindex: str
+    gs_hindex: str
     sinta_score_3yr: str
     sinta_score_total: str
     affil_score_3yr: str

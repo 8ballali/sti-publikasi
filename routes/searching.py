@@ -13,7 +13,7 @@ router = APIRouter(
     tags=['Searching General']
 )
 
-@router.get("/authors/search", response_model=List[AuthorDetailResponse])
+@router.get("/search/authors", response_model=List[AuthorDetailResponse])
 def search_authors_by_name(name: str, db: Session = Depends(get_db)):
     # Case-insensitive search
     users = db.query(User).filter(func.lower(User.name).like(f"%{name.lower()}%")).all()
@@ -47,7 +47,7 @@ def search_authors_by_name(name: str, db: Session = Depends(get_db)):
     return results
 
 
-@router.get("/articles/search", response_model=List[ArticleWithAuthorsResponse])
+@router.get("/search/articles", response_model=List[ArticleWithAuthorsResponse])
 def search_articles_by_title(title: str, db: Session = Depends(get_db)):
     articles = db.query(Article).filter(Article.title.ilike(f"%{title}%")).all()
 

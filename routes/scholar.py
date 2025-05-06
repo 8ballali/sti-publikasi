@@ -178,8 +178,11 @@ async def upload_abstracts(file: UploadFile = File(...), db: Session = Depends(g
 
     for index, row in df.iterrows():
         csv_title_raw = str(row.iloc[1]).strip()        # kolom ke-2: judul
-        new_article_url = str(row.iloc[7]).strip()      # kolom ke-7: URL
-        new_abstract = str(row.iloc[8]).strip()         # kolom ke-9: abstrak
+        raw_article_url = row.iloc[7]
+        new_article_url = str(raw_article_url).strip() if not pd.isna(raw_article_url) else ""
+        raw_abstract = row.iloc[8]
+        new_abstract = str(raw_abstract).strip() if not pd.isna(raw_abstract) else ""
+
 
         normalized_csv_title = normalize(csv_title_raw)
         match = get_close_matches(normalized_csv_title, normalized_db_titles.keys(), n=1, cutoff=0.8)

@@ -6,14 +6,32 @@ from typing import List
 from schemas import PaperResponse, GarudaAbstractResponse
 from sqlalchemy.orm import Session
 from models import Article, User, Author, PublicationAuthor
+import random
 
 
 def garuda_scrapping(lecturer_name: str, profile_link: str):
     garuda_url = f"{profile_link}?view=garuda"
     print(f'Fetching data from: {garuda_url}')
-    response = requests.get(garuda_url)
+
+    # Tambahkan headers agar tidak terdeteksi sebagai bot
+    headers = {
+        'User-Agent': random.choice([
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+            'Mozilla/5.0 (X11; Linux x86_64)',
+        ]),
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    try:
+        response = requests.get(garuda_url, headers=headers)
+        time.sleep(1)  # jeda sejenak agar tidak dianggap bot
+    except Exception as e:
+        print(f"Request error: {e}")
+        return []
 
     papers = []
+
     if response.status_code == 200:
         soup = BeautifulSoup(response.content, 'html.parser')
         for item in soup.find_all('div', class_='ar-list-item mb-5'):
@@ -23,7 +41,7 @@ def garuda_scrapping(lecturer_name: str, profile_link: str):
             journal_category_tag = item.find('div', class_='ar-meta').find('a', class_='ar-pub')
             journal_category = journal_category_tag.text.strip() if journal_category_tag else 'N/A'
 
-            second_meta_div = item.find_all('div', class_='ar-meta')[1] if len(item.find_all('div', class_='ar-meta')) > 1 else None
+            second_meta_div = item.find_all('div', class_='ar-meta')[1] if len(item.find_all('div', 'ar-meta')) > 1 else None
             author_order, year, doi, accred = 'N/A', 'N/A', 'N/A', 'N/A'
             authors = []
 
@@ -58,6 +76,10 @@ def garuda_scrapping(lecturer_name: str, profile_link: str):
                 doi=doi,
                 accred=accred
             ))
+    else:
+        print(f"[{response.status_code}] Failed to fetch: {garuda_url}")
+        print("Response content:")
+        print(response.text[:1000])  # hanya tampilkan 1000 karakter pertama untuk debug
 
     return papers
 

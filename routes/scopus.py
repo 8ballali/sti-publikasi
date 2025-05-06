@@ -15,7 +15,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 import undetected_chromedriver as uc
 from fake_useragent import UserAgent
-from selenium.webdriver.support.ui import WebDriverWait
+import unicodedata
 from selenium.webdriver.support import expected_conditions as EC
 
 
@@ -177,4 +177,67 @@ async def abstract_google_scholar(db: Session = Depends(get_db)):
     }
 
 
+
+def normalize(text: str) -> str:
+    # Ubah ke huruf kecil
+    text = text.lower()
+
+    # Hilangkan accent/diakritik (contoh: é -> e)
+    text = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8')
+
+    # Hilangkan karakter non-alfabet dan angka (kecuali spasi)
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+
+    # Hilangkan spasi berlebih
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    return text
+
+@router.post("/scopus/upload-abstracts")
+async def upload_abstracts(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    try:
+        contents = await file.read()
+        csv_buffer = StringIO(contents.decode('utf-8'))
+        df = pd.read_csv(csv_buffer)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading CSV file: {str(e)}")
+
+    if df.shape[1] < 9:
+        raise HTTPException(status_code=400, detail="CSV file must have at least 9 columns.")
+
+    updated_count = 0
+    unmatched_titles = []
+
+    # Ambil hanya artikel dari source SCOPUS
+    all_articles = db.query(Article).filter(Article.source == "SCOPUS").all()
+    normalized_db_titles = {normalize(article.title): article for article in all_articles}
+
+    for index, row in df.iterrows():
+        csv_title_raw = str(row.iloc[1]).strip()        # kolom ke-2: judul
+        raw_article_url = row.iloc[7]
+        new_article_url = str(raw_article_url).strip() if not pd.isna(raw_article_url) else ""
+        raw_abstract = row.iloc[8]
+        new_abstract = str(raw_abstract).strip() if not pd.isna(raw_abstract) else ""
+
+
+        normalized_csv_title = normalize(csv_title_raw)
+        match = get_close_matches(normalized_csv_title, normalized_db_titles.keys(), n=1, cutoff=0.8)
+
+        if match:
+            matched_article = normalized_db_titles[match[0]]
+            matched_article.abstract = new_abstract
+
+            if new_article_url:  # hanya update jika kolom 7 tidak kosong
+                matched_article.article_url = new_article_url
+
+            updated_count += 1
+        else:
+            unmatched_titles.append(csv_title_raw)
+
+    db.commit()
+
+    return {
+        "message": f"{updated_count} articles updated successfully.",
+        "unmatched_titles": unmatched_titles
+    }
 

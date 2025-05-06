@@ -14,10 +14,14 @@ class Author(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True)
     sinta_profile_url = Column(String(255), nullable=True)
+    sinta_id = Column(String(255), nullable=True)
     sinta_score_3yr = Column(String(255), nullable=True)
     sinta_score_total = Column(String(255), nullable=True)
     affil_score_3yr = Column(String(255), nullable=True)
     affil_score_total = Column(String(255), nullable=True)
+    scopus_hindex = Column(String(255), nullable=True)
+    gs_hindex = Column(String(255), nullable=True)
+
 
     user = relationship("User", back_populates="author")
     publications = relationship("PublicationAuthor", back_populates="author")

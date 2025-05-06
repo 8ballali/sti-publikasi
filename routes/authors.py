@@ -52,6 +52,9 @@ async def scrape_subjects(db: Session = Depends(get_db)):
         results.append({
             "lecturer_name": lecturer_name,
             "sinta_profile_url": author.sinta_profile_url,
+            "sinta_id": author.sinta_id,
+            "scopus_hindex" : author.scopus_hindex,
+            "gs_hindex" : author.gs_hindex,
             "sinta_score_3yr": author.sinta_score_3yr,
             "sinta_score_total": author.sinta_score_total,
             "affil_score_3yr": author.affil_score_3yr,
@@ -73,6 +76,8 @@ async def scrape_authors_debug():
             "lecturer_name": data.lecturer_name,
             "sinta_profile_url": data.sinta_profile_url,
             "sinta_id": data.sinta_id,
+            "scopus_hindex": data.scopus_hindex,
+            "gs_hindex": data.gs_hindex,
             "profile_link": data.profile_link,
             "sinta_score_3yr": data.sinta_score_3yr,
             "sinta_score_total": data.sinta_score_total,
