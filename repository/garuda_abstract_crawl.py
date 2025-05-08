@@ -25,7 +25,7 @@ def garuda_scrapping(lecturer_name: str, profile_link: str):
 
     try:
         response = requests.get(garuda_url, headers=headers)
-        time.sleep(1)  # jeda sejenak agar tidak dianggap bot
+        time.sleep(3)  # jeda 3 detik setelah request
     except Exception as e:
         print(f"Request error: {e}")
         return []
@@ -41,7 +41,8 @@ def garuda_scrapping(lecturer_name: str, profile_link: str):
             journal_category_tag = item.find('div', class_='ar-meta').find('a', class_='ar-pub')
             journal_category = journal_category_tag.text.strip() if journal_category_tag else 'N/A'
 
-            second_meta_div = item.find_all('div', class_='ar-meta')[1] if len(item.find_all('div', 'ar-meta')) > 1 else None
+            meta_divs = item.find_all('div', class_='ar-meta')
+            second_meta_div = meta_divs[1] if len(meta_divs) > 1 else None
             author_order, year, doi, accred = 'N/A', 'N/A', 'N/A', 'N/A'
             authors = []
 

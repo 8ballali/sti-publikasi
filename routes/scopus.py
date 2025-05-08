@@ -202,7 +202,7 @@ async def upload_abstracts(file: UploadFile = File(...), db: Session = Depends(g
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading CSV file: {str(e)}")
 
-    if df.shape[1] < 9:
+    if df.shape[1] < 4:
         raise HTTPException(status_code=400, detail="CSV file must have at least 9 columns.")
 
     updated_count = 0
@@ -213,10 +213,10 @@ async def upload_abstracts(file: UploadFile = File(...), db: Session = Depends(g
     normalized_db_titles = {normalize(article.title): article for article in all_articles}
 
     for index, row in df.iterrows():
-        csv_title_raw = str(row.iloc[1]).strip()        # kolom ke-2: judul
+        csv_title_raw = str(row.iloc[0]).strip()        # kolom ke-2: judul
         raw_article_url = row.iloc[7]
         new_article_url = str(raw_article_url).strip() if not pd.isna(raw_article_url) else ""
-        raw_abstract = row.iloc[8]
+        raw_abstract = row.iloc[1]
         new_abstract = str(raw_abstract).strip() if not pd.isna(raw_abstract) else ""
 
 
@@ -227,7 +227,7 @@ async def upload_abstracts(file: UploadFile = File(...), db: Session = Depends(g
             matched_article = normalized_db_titles[match[0]]
             matched_article.abstract = new_abstract
 
-            if new_article_url:  # hanya update jika kolom 7 tidak kosong
+            if new_article_url:  #Updating Abstract
                 matched_article.article_url = new_article_url
 
             updated_count += 1
