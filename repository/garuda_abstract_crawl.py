@@ -7,13 +7,13 @@ from schemas import PaperResponse, GarudaAbstractResponse
 from sqlalchemy.orm import Session
 from models import Article, User, Author, PublicationAuthor
 import random
+from sqlalchemy.exc import IntegrityError
 
 
 def garuda_scrapping(lecturer_name: str, profile_link: str):
     garuda_url = f"{profile_link}?view=garuda"
-    print(f'Fetching data from: {garuda_url}')
+    print(f'📡 Fetching data from: {garuda_url}')
 
-    # Tambahkan headers agar tidak terdeteksi sebagai bot
     headers = {
         'User-Agent': random.choice([
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -24,65 +24,80 @@ def garuda_scrapping(lecturer_name: str, profile_link: str):
     }
 
     try:
-        response = requests.get(garuda_url, headers=headers)
-        time.sleep(3)  # jeda 3 detik setelah request
+        response = requests.get(garuda_url, headers=headers, timeout=10)
+        time.sleep(3)  # Delay acak
     except Exception as e:
-        print(f"Request error: {e}")
+        log_error(f"[RequestError] {lecturer_name} - {garuda_url} - {str(e)}")
         return []
 
     papers = []
 
     if response.status_code == 200:
         soup = BeautifulSoup(response.content, 'html.parser')
-        for item in soup.find_all('div', class_='ar-list-item mb-5'):
-            title_tag = item.find('div', class_='ar-title').find('a')
-            title = title_tag.text.strip() if title_tag else 'N/A'
-            publication_link = title_tag['href'] if title_tag and title_tag.has_attr('href') else 'N/A'
-            journal_category_tag = item.find('div', class_='ar-meta').find('a', class_='ar-pub')
-            journal_category = journal_category_tag.text.strip() if journal_category_tag else 'N/A'
+        items = soup.find_all('div', class_='ar-list-item mb-5')
 
-            meta_divs = item.find_all('div', class_='ar-meta')
-            second_meta_div = meta_divs[1] if len(meta_divs) > 1 else None
-            author_order, year, doi, accred = 'N/A', 'N/A', 'N/A', 'N/A'
-            authors = []
+        if not items:
+            log_error(f"[NoData] {lecturer_name} - {garuda_url} - Halaman tidak mengandung publikasi.")
+            return []
 
-            if second_meta_div:
-                for a_tag in second_meta_div.find_all('a', href='#!'):
-                    text = a_tag.text.strip()
-                    if 'Author Order' in text:
-                        match = re.search(r'\d+', text)
-                        if match:
-                            author_order = match.group()
-                    else:
-                        i_tag = a_tag.find('i')
-                        if i_tag:
-                            icon_class = i_tag.get('class', [])
-                            if 'zmdi-calendar' in icon_class:
-                                year = text.replace('📅', '').strip()
-                            elif 'zmdi-comment-list' in icon_class:
-                                doi = text.replace('🔗', '').replace('DOI: ', '').strip()
-                            elif 'zmdi-chart-donut' in icon_class:
-                                accred = text.replace('📊', '').replace('Accred : ', '').strip()
+        for item in items:
+            try:
+                title_container = item.find('div', class_='ar-title')
+                title_tag = title_container.find('a') if title_container else None
+                title = title_tag.text.strip() if title_tag else 'N/A'
+                publication_link = title_tag['href'] if title_tag and title_tag.has_attr('href') else 'N/A'
+
+                meta_divs = item.find_all('div', class_='ar-meta')
+                journal_category_tag = meta_divs[0].find('a', class_='ar-pub') if len(meta_divs) > 0 else None
+                journal_category = journal_category_tag.text.strip() if journal_category_tag else 'N/A'
+
+                second_meta_div = meta_divs[1] if len(meta_divs) > 1 else None
+                author_order, year, doi, accred = 'N/A', 'N/A', 'N/A', 'N/A'
+                authors = []
+
+                if second_meta_div:
+                    for a_tag in second_meta_div.find_all('a', href='#!'):
+                        text = a_tag.text.strip()
+                        if 'Author Order' in text:
+                            match = re.search(r'\d+', text)
+                            if match:
+                                author_order = match.group()
                         else:
-                            authors.append(text)
+                            i_tag = a_tag.find('i')
+                            if i_tag:
+                                icon_class = i_tag.get('class', [])
+                                if 'zmdi-calendar' in icon_class:
+                                    year = text.replace('📅', '').strip()
+                                elif 'zmdi-comment-list' in icon_class:
+                                    doi = text.replace('🔗', '').replace('DOI: ', '').strip()
+                                elif 'zmdi-chart-donut' in icon_class:
+                                    accred = text.replace('📊', '').replace('Accred : ', '').strip()
+                            else:
+                                authors.append(text)
 
-            papers.append(PaperResponse(
-                lecturer_name=lecturer_name,
-                title=title,
-                publication_link=publication_link,
-                journal_category=journal_category,
-                author_order=author_order,
-                authors=authors,
-                year=year,
-                doi=doi,
-                accred=accred
-            ))
+                papers.append(PaperResponse(
+                    lecturer_name=lecturer_name,
+                    title=title,
+                    publication_link=publication_link,
+                    journal_category=journal_category,
+                    author_order=author_order,
+                    authors=authors,
+                    year=year,
+                    doi=doi,
+                    accred=accred
+                ))
+            except Exception as parse_error:
+                log_error(f"[ParseError] {lecturer_name} - {garuda_url} - {parse_error}")
     else:
-        print(f"[{response.status_code}] Failed to fetch: {garuda_url}")
-        print("Response content:")
-        print(response.text[:1000])  # hanya tampilkan 1000 karakter pertama untuk debug
+        log_error(f"[HTTPError] {lecturer_name} - {garuda_url} - Status code: {response.status_code}")
+        print("Preview response content:", response.text[:300])
 
     return papers
+
+def log_error(message: str):
+    print("🚫", message)
+    with open("garuda_scrape_errors.log", "a", encoding="utf-8") as f:
+        f.write(message + "\n")
 
 def garuda_data(scraped_data: list[PaperResponse], db: Session):
     for data in scraped_data:
@@ -92,7 +107,6 @@ def garuda_data(scraped_data: list[PaperResponse], db: Session):
         ).first()
 
         if not article:
-            # Jika artikel belum ada, buat entri baru
             article = Article(
                 title=data.title,
                 year=int(data.year) if data.year.isdigit() else None,
@@ -100,32 +114,36 @@ def garuda_data(scraped_data: list[PaperResponse], db: Session):
                 accred=data.accred,
                 article_url=data.publication_link,
                 journal=data.journal_category,
-                source = "GARUDA"
+                source="GARUDA"
             )
             db.add(article)
-            db.commit()  # Commit setelah menambahkan artikel
-            db.refresh(article)  # Refresh agar ID tersedia
+            db.commit()
+            db.refresh(article)
 
-        # Cek apakah author sudah ada di tabel User berdasarkan `lecturer_name`
-        author = db.query(User).filter(User.name.ilike(f"%{data.lecturer_name}%")).first()
+        # Proses semua penulis
+        for idx, author_name in enumerate(data.authors):
+            author = db.query(User).filter(User.name.ilike(f"%{author_name}%")).first()
+            if not author:
+                continue  # Lewati jika tidak ditemukan
 
-        if author:
-            author_id = author.id
-
-            # Cek apakah relasi author-article sudah ada di PublicationAuthor
+            # Cek duplikat kombinasi article + author
             existing_relation = db.query(PublicationAuthor).filter_by(
                 article_id=article.id,
-                author_id=author_id,
+                author_id=author.id
             ).first()
 
             if not existing_relation:
-                new_relation = PublicationAuthor(
+                author_order = int(data.author_order) if data.author_order and data.author_order.isdigit() else None
+                db.add(PublicationAuthor(
                     article_id=article.id,
-                    author_id=author_id,
-                    author_order=int(data.author_order) if data.author_order.isdigit() else 0
-                )
-                db.add(new_relation)
-    db.commit()  # Commit setelah menambahkan relasi author-article
+                    author_id=author.id,
+                    author_order=author_order
+                ))
+
+    db.commit()
+
+
+
 
 def garuda_sync(lecturer_name: str, profile_link: str):
     garuda_url = f"{profile_link}?view=garuda"
@@ -222,3 +240,55 @@ def garuda_abstract_scraping(article_list: List[tuple]) -> List[GarudaAbstractRe
 
     return results
 
+
+def get_lecturers_with_profiles(db: Session):
+    return db.query(User.name, Author.sinta_profile_url)\
+             .select_from(User).join(Author).all()
+
+
+def save_scraped_data_to_db(scraped_data: list[PaperResponse], db: Session):
+    for paper in scraped_data:
+        # 1. Cari atau buat article
+        article = db.query(Article).filter(
+            (Article.doi == paper.doi) | (Article.title == paper.title)
+        ).first()
+
+        if not article:
+            article = Article(
+                title=paper.title,
+                year=int(paper.year) if paper.year and paper.year.isdigit() else None,
+                doi=paper.doi if paper.doi and paper.doi.lower() != "none" else None,
+                accred=paper.accred,
+                article_url=paper.publication_link,
+                journal=paper.journal_category,
+                source="GARUDA"
+            )
+            db.add(article)
+            db.commit()
+            db.refresh(article)
+
+        # 2. Cari author berdasarkan nama (user.name)
+        user = db.query(User).filter(User.name.ilike(f"%{paper.lecturer_name}%")).first()
+        if not user:
+            continue  # lewati kalau author tidak ditemukan
+
+        author = db.query(Author).filter_by(user_id=user.id).first()
+        if not author:
+            continue  # lewati kalau tidak ada relasi ke Author
+
+        # 3. Tambahkan relasi article-author dengan pengecekan error duplikat
+        author_order = int(paper.author_order) if paper.author_order and paper.author_order.isdigit() else None
+        relation = PublicationAuthor(
+            article_id=article.id,
+            author_id=author.id,
+            author_order=author_order
+        )
+
+        try:
+            db.add(relation)
+            db.flush()  # coba simpan ke memory, akan error jika duplikat
+        except IntegrityError:
+            db.rollback()  # batalkan relasi duplikat
+            continue
+
+    db.commit()

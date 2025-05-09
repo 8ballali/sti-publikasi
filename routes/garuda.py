@@ -7,8 +7,8 @@ from typing import List
 from bs4 import BeautifulSoup
 import requests, time
 import re
-
-from models import User, Author, Article, Subject, UserSubject
+from repository.garuda_abstract_crawl import get_lecturers_with_profiles, save_scraped_data_to_db
+from models import User, Author, Article
 from schemas import GarudaAbstractResponse
 
 
@@ -19,29 +19,25 @@ router = APIRouter(
 )
 
 @router.get("/scrape/garuda")
-async def scrape_garuda(db: Session = Depends(get_db)):
-    results = []
-
-    # Mengambil data dosen dari database
-    lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
-    print(f"Jumlah dosen: {len(lecturers)}")  # Debugging
+async def scrape_garuda_route(db: Session = Depends(get_db)):
+    lecturers = get_lecturers_with_profiles(db)
+    all_results = []
 
     for lecturer_name, profile_link in lecturers:
-        if profile_link:
-            print(f"Memproses dosen: {lecturer_name}")  # Debugging
-            
-            
-            scraped_data = garuda_scrapping(lecturer_name, profile_link)
-            
-            print(f"Scraped data untuk {lecturer_name}: {scraped_data}")
-            print(f"Jumlah data yang di-scrape: {len(scraped_data)}")  # Debugging
-            
-            # Simpan hasil scraping ke database
-            garuda_data(scraped_data, db)  
+        if not profile_link:
+            continue
+        print(f"Scraping data for: {lecturer_name}")
+        scraped_papers = garuda_scrapping(lecturer_name, profile_link)
+        print(f"Scraped {len(scraped_papers)} papers for {lecturer_name}")
+        save_scraped_data_to_db(scraped_papers, db)
+        all_results.extend(scraped_papers)
 
-            results.extend(scraped_data)
-
-    return {"message": "Scraping selesai dan data telah disimpan ke database!"}
+    return {
+        "success": True,
+        "message": "Scraping Garuda Success",
+        "total_scraped": len(all_results),
+        "scraped_results": all_results
+    }
 
 @router.get("/scrape/abstract/garuda")
 async def abstract_garuda(db: Session = Depends(get_db)):
@@ -103,7 +99,11 @@ async def sync_garuda(db: Session = Depends(get_db)):
 
             results.extend(scraped_data)
 
-    return {"message": "Sync Data selesai, Data Telah Diperbarui!"}
+    return {
+        "message": "Sync GARUDA selesai",
+        "total_saved": len(results),
+        "saved_data": results
+    }
 
 
 @router.get("/scrape/garuda/debug")

@@ -9,7 +9,7 @@ from repository.subject_crawl import scrape_all_subjects
 router = APIRouter()
 
 router = APIRouter(
-    tags=['Authors']
+    tags=['Authors & Subjects']
 )
 
 @router.get("/scrape/authors")

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -90,6 +90,10 @@ class PublicationAuthor(Base):
     author_order = Column(Integer, nullable=True)
     article = relationship("Article", back_populates="authors")
     author = relationship("Author", back_populates="publications")
+    __table_args__ = (
+    UniqueConstraint('article_id', 'author_id', name='uq_article_author'),
+)
+
 
 class Keyword(Base):
     __tablename__ = "keywords"
