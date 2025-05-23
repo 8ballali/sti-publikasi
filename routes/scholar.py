@@ -11,6 +11,7 @@ import requests, re
 import unicodedata
 from schemas import ArticleResponse
 from typing import List
+from sqlalchemy import and_
 
 
 router = APIRouter()
@@ -41,81 +42,103 @@ async def scrape_scholar(db: Session = Depends(get_db)):
 
     return {"message": "Scraping Scholar selesai dan data telah disimpan ke database!"}
 
-@router.post("/upload/google-scholar-excel")
-async def upload_google_scholar_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+def generate_initials(name: str) -> str:
+    parts = name.strip().split()
+    if len(parts) < 2:
+        return name  # fallback
+    initials = ''.join([p[0].upper() for p in parts[:-1]])
+    last_name = parts[-1].capitalize()
+    return f"{initials} {last_name}"
+
+@router.post("/upload/google-scholar")
+async def upload_google_scholar(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.endswith(('.xls', '.xlsx', '.csv')):
         return {"error": "Format file harus Excel (.xls/.xlsx) atau CSV"}
 
-    df = pd.read_excel(file.file) if file.filename.endswith(('.xls', '.xlsx')) else pd.read_csv(file.file)
+    df = pd.read_csv(file.file) if file.filename.endswith('.csv') else pd.read_excel(file.file)
     inserted_count = 0
-    linked_count = 0
+    skipped_count = 0
 
     for _, row in df.iterrows():
+        user_id = str(row.get("User ID", "")).strip()
         title = str(row.get("Judul", "")).strip()
-        year = str(row.get("Tahun", "")).strip()
         url = str(row.get("Paper Link", "")).strip()
         journal = str(row.get("Kategori Jurnal", "")).strip()
+        year = str(row.get("Tahun", "")).strip()
         cited = str(row.get("Cited", "")).strip()
-        user_sinta_id = str(row.get("User ID", "")).strip()
-
-        # Hapus "Authors : " lalu split berdasarkan koma
         authors_raw = str(row.get("Author", "")).replace("Authors :", "").strip()
-        authors = [a.strip() for a in authors_raw.split(',') if a.strip() and "..." not in a]
 
-        # Cek apakah artikel sudah ada berdasarkan judul + source
-        existing_article = db.query(Article).filter_by(title=title, source="GOOGLE_SCHOLAR").first()
-        if existing_article:
-            article = existing_article
-        else:
-            article = Article(
-                title=title,
-                year=int(year) if year.isdigit() else None,
-                article_url=url,
-                journal=journal,
-                citation_count=int(cited) if cited.isdigit() else None,
-                source="GOOGLE_SCHOLAR"
-            )
-            db.add(article)
-            db.commit()
-            db.refresh(article)
-            inserted_count += 1
+        # Ambil Author
+        authors_list = [a.strip() for a in authors_raw.split(',') if a.strip() and "..." not in a]
 
-        # Temukan author berdasarkan User ID → Author → User
-        author = db.query(Author).filter(Author.sinta_id == user_sinta_id).first()
+        # Cari author berdasarkan User ID ke tabel authors
+        author = db.query(Author).filter(Author.sinta_id == user_id).first()
         if not author:
+            skipped_count += 1
             continue
 
-        user = db.query(User).filter(User.id == author.user_id).first()
-        if not user or not user.name:
+        user = author.user
+        if not user:
+            skipped_count += 1
             continue
 
-        # Gunakan pendekatan keyword untuk tentukan author_order
-        lecturer_keywords = [kw for kw in user.name.lower().split() if len(kw) > 2]
+        # Buat inisial nama dosen: "Christy Atika Sari" → "CA Sari"
+        expected_initial = generate_initials(user.name)
+
+        # Cari author_order yang cocok berdasarkan inisial
         author_order = None
-
-        for idx, name in enumerate(authors):
-            if any(kw in name.lower() for kw in lecturer_keywords):
+        for idx, name in enumerate(authors_list):
+            if name.lower() == expected_initial.lower():
                 author_order = idx + 1
                 break
 
-        if author_order is not None:
-            existing_rel = db.query(PublicationAuthor).filter_by(
-                article_id=article.id,
-                author_id=author.id
-            ).first()
-            if not existing_rel:
-                db.add(PublicationAuthor(
-                    article_id=article.id,
-                    author_id=author.id,
-                    author_order=author_order
-                ))
-                db.commit()
-                linked_count += 1
+        # Jika gagal pakai inisial, fallback ke keyword match
+        if author_order is None:
+            lecturer_keywords = [kw for kw in user.name.lower().split() if len(kw) > 2]
+            for idx, name in enumerate(authors_list):
+                if any(kw in name.lower() for kw in lecturer_keywords):
+                    author_order = idx + 1
+                    break
+
+        if author_order is None:
+            skipped_count += 1
+            continue
+
+        # Cek duplikat berdasarkan judul + source
+        existing = db.query(Article).filter(and_(
+            Article.title == title,
+            Article.source == "GOOGLE_SCHOLAR"
+        )).first()
+        if existing:
+            continue
+
+        # Simpan Article
+        article = Article(
+            title=title,
+            year=int(year) if year.isdigit() else None,
+            article_url=url,
+            journal=journal,
+            source="GOOGLE_SCHOLAR",
+            citation_count=int(cited) if cited.isdigit() else None
+        )
+        db.add(article)
+        db.commit()
+        db.refresh(article)
+
+        # Simpan relasi author → artikel
+        db.add(PublicationAuthor(
+            article_id=article.id,
+            author_id=author.id,
+            author_order=author_order
+        ))
+        db.commit()
+
+        inserted_count += 1
 
     return {
         "success": True,
         "inserted_articles": inserted_count,
-        "linked_authors": linked_count
+        "skipped_rows": skipped_count
     }
 
 
