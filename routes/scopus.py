@@ -17,6 +17,8 @@ import undetected_chromedriver as uc
 from fake_useragent import UserAgent
 import unicodedata
 from selenium.webdriver.support import expected_conditions as EC
+from models import PublicationAuthor
+from sqlalchemy import and_
 
 
 
@@ -70,6 +72,67 @@ async def sync_scopus(db: Session = Depends(get_db)):
 
     return {"message": "Scraping Scopus selesai dan data telah disimpan ke database!"}
 
+@router.post("/upload/scopus-excel")
+async def upload_scopus_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.endswith(('.xls', '.xlsx', '.csv')):
+        return {"error": "Format file harus Excel (.xls/.xlsx) atau CSV"}
+
+    df = pd.read_csv(file.file) if file.filename.endswith('.csv') else pd.read_excel(file.file)
+    inserted_count = 0
+
+    for _, row in df.iterrows():
+        sinta_id = str(row.get("User ID", "")).strip()
+        title = str(row.get("Title", "")).strip()
+        accred = str(row.get("Accred", "")).strip()
+        journal = str(row.get("Jurnal", "")).strip()
+        year = str(row.get("Year", "")).strip()
+        cited = row.get("Cited", None)
+        author_order = row.get("Order", None)
+
+        # Validasi dasar
+        if not title or not sinta_id:
+            continue
+
+        # Cek author by sinta_id
+        author = db.query(Author).filter(Author.sinta_id == sinta_id).first()
+        if not author:
+            continue
+
+        # Cek duplikat berdasarkan title + source
+        existing_article = db.query(Article).filter(and_(
+            Article.title == title,
+            Article.source == "SCOPUS"
+        )).first()
+
+        if existing_article:
+            continue
+
+        article = Article(
+            title=title,
+            year=int(year) if year.isdigit() else None,
+            accred=accred,
+            journal=journal,
+            source="SCOPUS",
+            citation_count=int(cited) if pd.notna(cited) and str(cited).isdigit() else None
+        )
+        db.add(article)
+        db.commit()
+        db.refresh(article)
+
+        # Tambahkan hubungan ke publication_authors
+        pub_author = PublicationAuthor(
+            article_id=article.id,
+            author_id=author.id,
+            author_order=int(author_order) if pd.notna(author_order) and str(author_order).isdigit() else None
+        )
+        db.add(pub_author)
+        db.commit()
+        inserted_count += 1
+
+    return {
+        "success": True,
+        "message": f"{inserted_count} artikel berhasil dimasukkan dari file Scopus.",
+    }
 
 def scrape_abstract_google_scholar(articles):
     # Set up Chrome with undetected_chromedriver

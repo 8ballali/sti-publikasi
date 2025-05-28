@@ -121,3 +121,9 @@ class AuthorDetailResponse(BaseModel):
     affil_score_3yr: Optional[str]
     affil_score_total: Optional[str]
     subjects: List[SubjectItem]
+
+
+class TopAuthorResponse(BaseModel):
+    author_id: int
+    name: str
+    article_count: int

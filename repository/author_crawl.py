@@ -2,8 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 import time
 from sqlalchemy.orm import Session
-from models import User, Author
-from schemas import CrawlAuthors
+from sqlalchemy import func
+from models import User, Author, PublicationAuthor
+from schemas import CrawlAuthors, TopAuthorResponse
 
 BASE_URL = "https://sinta.kemdikbud.go.id/departments/authors/20/896879FE-5FBE-4AB0-A7CD-3FAD1EEE3CFF/6635C54C-E05B-4161-A443-BCCA6926474A"
 
@@ -105,3 +106,33 @@ def save_scraped_data(scraped_data: list, db: Session):
 
     db.commit()
     return saved, skipped
+
+
+def get_top_authors(db: Session, limit: int = 10):
+    results = (
+        db.query(
+            Author.id.label("author_id"),
+            User.name.label("name"),
+            func.count(PublicationAuthor.article_id).label("article_count")
+        )
+        .join(User, Author.user_id == User.id)
+        .join(PublicationAuthor, PublicationAuthor.author_id == Author.id)
+        .group_by(Author.id, User.name)
+        .order_by(func.count(PublicationAuthor.article_id).desc())
+        .limit(limit)
+        .all()
+    )
+
+    top_authors = []
+    for r in results:
+        top_authors.append({
+            "author_id": r.author_id,
+            "name": r.name or "-",
+            "article_count": r.article_count or 0
+        })
+
+    return {
+        "success": True,
+        "message": "Top authors fetched successfully",
+        "data": top_authors
+    }
