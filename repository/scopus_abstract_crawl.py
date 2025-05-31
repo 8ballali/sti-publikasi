@@ -6,6 +6,7 @@ from typing import List
 from schemas import PaperResponse, PaperResponseScopus
 from sqlalchemy.orm import Session
 from models import Article, User, Author, PublicationAuthor
+from sqlalchemy.exc import IntegrityError
 
 
 def scopus_scrapping(lecturer_name: str, profile_link: str) -> List[PaperResponseScopus]:
@@ -96,13 +97,19 @@ def scopus_data(scraped_data: List[PaperResponseScopus], db: Session):
                 source="SCOPUS"
             )
             db.add(article)
-            db.commit()
-            db.refresh(article)
+            try:
+                db.commit()
+                db.refresh(article)
+            except IntegrityError:
+                db.rollback()
+                continue  # Lewati jika gagal menyimpan artikel
 
         # Cek apakah dosen sudah ada
         author = db.query(User).filter(User.name.ilike(f"%{data.lecturer_name}%")).first()
         if author:
             author_id = author.id
+
+            # Cek relasi apakah sudah ada
             existing_relation = db.query(PublicationAuthor).filter_by(
                 article_id=article.id,
                 author_id=author_id,
@@ -115,8 +122,11 @@ def scopus_data(scraped_data: List[PaperResponseScopus], db: Session):
                     author_order=data.author_order
                 )
                 db.add(new_relation)
-
-    db.commit()
+                try:
+                    db.commit()
+                except IntegrityError:
+                    db.rollback()
+                    continue  # Lewati jika gagal menyimpan relasi
 
 def scopus_sync(lecturer_name: str, profile_link: str) -> List[PaperResponseScopus]:
     results = []

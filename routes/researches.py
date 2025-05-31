@@ -6,7 +6,7 @@ from database import get_db
 from models import User, Author, ResearcherAuthor, Research
 from bs4 import BeautifulSoup
 from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data, scholar_sync
-from repository.research_crawl import scrape_sinta_research
+from repository.research_crawl import research_sync
 import re
 import requests
 import time
@@ -94,23 +94,6 @@ def upload_research_csv(file: UploadFile = File(...), db: Session = Depends(get_
         raise HTTPException(status_code=500, detail=str(e))
     
 
-
-# --- Fungsi Pembantu untuk Background Task (PENTING!) ---
-def process_scrape_researches_for_user(user_id: str, sinta_profile_url: str):
-    """
-    Fungsi wrapper untuk menjalankan scraping dalam background task.
-    Ia akan membuat sesi DB-nya sendiri.
-    """
-    db = SessionLocal() # Membuat sesi database baru
-    try:
-        scrape_researches_for_user_headless(user_id, sinta_profile_url, db)
-    except Exception as e:
-        print(f"ERROR in background task for user {user_id}: {e}")
-    finally:
-        db.close() # Pastikan sesi ditutup setelah selesai
-
-# --- Fungsi Scraping Research (Headless) ---
-def scrape_researches_for_user_headless(user_id: str, sinta_profile_url: str, db: Session):
     """
     Melakukan scraping data penelitian (researches) dari profil Sinta seorang user
     secara headless menggunakan requests dan BeautifulSoup, lalu menyimpannya ke database.
@@ -257,44 +240,61 @@ def scrape_researches_for_user_headless(user_id: str, sinta_profile_url: str, db
         page += 1
         time.sleep(1.5)
 
-@router.post("/sync-researches/")
-async def sync_all_researches(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """
-    Endpoint untuk memulai sinkronisasi data penelitian (Research) dari Sinta ke database.
-    Proses scraping akan berjalan di background secara headless.
-    """
-    
-    # Ambil semua penulis dari database
-    authors_from_db = crud.get_all_authors(db)
+@router.post("/sync-researches")
+def sync_all_researches(db: Session = Depends(get_db)):
+    authors = db.query(Author).filter(Author.sinta_id.isnot(None)).all()
+    total_inserted = 0
+    total_relations = 0
 
-    if not authors_from_db:
-        print("Tidak ada penulis di database. Mencoba membaca dari sinta_authors.csv sebagai daftar awal.")
-        try:
-            with open("sinta_authors.csv", mode='r', encoding='utf-8') as sinta_file:
-                reader = csv.DictReader(sinta_file)
-                for row in reader:
-                    sinta_id = row['Sinta ID']
-                    sinta_profile_url = row.get('sinta_profile_url', f'https://sinta.kemdikbud.go.id/authors/profile/{sinta_id}')
-                    
-                    # Tambahkan ke DB jika belum ada
-                    existing_author = crud.get_author_by_sinta_id(db, sinta_id)
-                    if not existing_author:
-                        crud.create_author(db, sinta_id, sinta_profile_url)
-                        print(f"Menambahkan Sinta ID {sinta_id} dari CSV ke database.")
-                db.commit() # Commit setelah semua author dari CSV ditambahkan
-            # Setelah menambahkan dari CSV, ambil lagi dari DB untuk memastikan semua terdaftar
-            authors_from_db = crud.get_all_authors(db)
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="sinta_authors.csv not found and no authors in database.")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error reading sinta_authors.csv: {e}")
+    for author in authors:
+        sinta_id = author.sinta_id
+        if not sinta_id:
+            continue
 
-    if not authors_from_db:
-        raise HTTPException(status_code=404, detail="No authors found to scrape for researches.")
+        print(f"🔍 Syncing for author: {author.user.name} ({sinta_id})")
+        researches = research_sync(sinta_id)
 
-    # Jalankan scraping di background untuk setiap penulis
-    for author in authors_from_db:
-        # Gunakan fungsi scraping headless yang baru
-        background_tasks.add_task(scrape_researches_for_user_headless, author.sinta_id, author.sinta_profile_url, db)
-    
-    return {"message": "Sinkronisasi data penelitian (Research) dimulai di background secara headless. Lihat log server untuk progres."}
+        for res in researches:
+            title = res["title"]
+
+            # Cek duplikasi research
+            existing = db.query(Research).filter(Research.title == title).first()
+            if existing:
+                research = existing
+            else:
+                research = Research(
+                    title=title,
+                    fund=float(res["fund"]) if res["fund"].replace(",", "").isdigit() else None,
+                    fund_status=res["fund_status"],
+                    fund_source=res["fund_source"],
+                    fund_type=res["fund_type"],
+                    year=int(res["year"]) if res["year"].isdigit() else None
+                )
+                db.add(research)
+                db.commit()
+                db.refresh(research)
+                total_inserted += 1
+
+            # Cek relasi
+            rel = db.query(ResearcherAuthor).filter_by(
+                researcher_id=research.id,
+                author_id=author.id
+            ).first()
+            if rel:
+                continue
+
+            is_leader = str(res["leader"]).lower() in ['ya', 'yes', 'true', '1']
+            researcher_author = ResearcherAuthor(
+                researcher_id=research.id,
+                author_id=author.id,
+                is_leader=is_leader
+            )
+            db.add(researcher_author)
+            db.commit()
+            total_relations += 1
+
+    return {
+        "success": True,
+        "inserted_researches": total_inserted,
+        "inserted_relations": total_relations
+    }
