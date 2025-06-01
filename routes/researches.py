@@ -240,6 +240,9 @@ def upload_research_csv(file: UploadFile = File(...), db: Session = Depends(get_
         page += 1
         time.sleep(1.5)
 
+def normalize_name(name: str) -> str:
+    return re.sub(r'\W+', '', name.lower().strip())
+
 @router.post("/sync-researches")
 def sync_all_researches(db: Session = Depends(get_db)):
     authors = db.query(Author).filter(Author.sinta_id.isnot(None)).all()
@@ -252,22 +255,26 @@ def sync_all_researches(db: Session = Depends(get_db)):
             continue
 
         print(f"🔍 Syncing for author: {author.user.name} ({sinta_id})")
-        researches = research_sync(sinta_id)
+        try:
+            researches = research_sync(sinta_id)
+        except Exception as e:
+            print(f"⚠️ Gagal sync {sinta_id}: {e}")
+            continue
 
         for res in researches:
-            title = res["title"]
+            title = res["title"].strip()
+            if not title:
+                continue
 
             # Cek duplikasi research
-            existing = db.query(Research).filter(Research.title == title).first()
-            if existing:
-                research = existing
-            else:
+            research = db.query(Research).filter(Research.title == title).first()
+            if not research:
                 research = Research(
                     title=title,
                     fund=float(res["fund"]) if res["fund"].replace(",", "").isdigit() else None,
-                    fund_status=res["fund_status"],
-                    fund_source=res["fund_source"],
-                    fund_type=res["fund_type"],
+                    fund_status=res["fund_status"] or None,
+                    fund_source=res["fund_source"] or None,
+                    fund_type=res["fund_type"] or None,
                     year=int(res["year"]) if res["year"].isdigit() else None
                 )
                 db.add(research)
@@ -276,14 +283,18 @@ def sync_all_researches(db: Session = Depends(get_db)):
                 total_inserted += 1
 
             # Cek relasi
-            rel = db.query(ResearcherAuthor).filter_by(
+            existing_relation = db.query(ResearcherAuthor).filter_by(
                 researcher_id=research.id,
                 author_id=author.id
             ).first()
-            if rel:
+            if existing_relation:
                 continue
 
-            is_leader = str(res["leader"]).lower() in ['ya', 'yes', 'true', '1']
+            # Cek apakah leader berdasarkan perbandingan nama
+            author_name = normalize_name(author.user.name)
+            leader_name = normalize_name(res["leader"])
+            is_leader = author_name == leader_name
+
             researcher_author = ResearcherAuthor(
                 researcher_id=research.id,
                 author_id=author.id,
