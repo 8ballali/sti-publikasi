@@ -1,6 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 
+
+class StandardResponse(BaseModel):
+    success: bool
+    message: Optional[str] = None
+    data: Optional[Any] = None
 class CrawlAuthors(BaseModel):
     lecturer_name: str
     sinta_profile_url: str
@@ -74,7 +79,6 @@ class ResearchResponse(BaseModel):
     status_penelitian: str
     sumber_pendanaan: str
 
-
     class Config:
         orm_mode = True
 
@@ -120,7 +124,10 @@ class AuthorDetailResponse(BaseModel):
     sinta_score_total: Optional[str]
     affil_score_3yr: Optional[str]
     affil_score_total: Optional[str]
-    subjects: List[SubjectItem]
+    subjects: List[str]
+    articles: List[ArticleResponse]
+    researches: List[ResearchResponse]
+
 
 
 class TopAuthorResponse(BaseModel):

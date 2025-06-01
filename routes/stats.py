@@ -1,0 +1,25 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from models import Author, Article
+from database import get_db
+from schemas import StandardResponse  # pastikan diimport
+
+router = APIRouter()
+router = APIRouter(
+    tags=['Statistics']
+)
+
+
+@router.get("/stats/summary", response_model=StandardResponse)
+def get_summary_counts(db: Session = Depends(get_db)):
+    total_authors = db.query(Author).count()
+    total_articles = db.query(Article).count()
+
+    return StandardResponse(
+        success=True,
+        message="Summary data fetched successfully",
+        data={
+            "total_authors": total_authors,
+            "total_articles": total_articles
+        }
+    )

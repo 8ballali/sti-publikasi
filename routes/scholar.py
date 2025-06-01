@@ -21,26 +21,7 @@ router = APIRouter(
 )
 
 
-@router.get("/scrape/scholar")
-async def scrape_scholar(db: Session = Depends(get_db)):
-    results = []
 
-    # Mengambil data dosen dari database
-    lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
-    print(f"Jumlah dosen: {len(lecturers)}")
-
-    for lecturer_name, profile_link in lecturers:
-        if profile_link:
-            print(f"Memproses dosen: {lecturer_name}")
-
-            scraped_data = scholar_scrapping(lecturer_name, profile_link)
-            print(f"Jumlah data yang di-scrape: {len(scraped_data)}")
-
-            scholar_data(scraped_data, db)
-
-            results.extend(scraped_data)
-
-    return {"message": "Scraping Scholar selesai dan data telah disimpan ke database!"}
 
 def generate_initials(name: str) -> str:
     parts = name.strip().split()
@@ -164,80 +145,6 @@ async def sync_scholar(db: Session = Depends(get_db)):
     return {"message": "Sync Data Article Google Scholar Selesai"}
 
 
-@router.get("/scrape/scholar/debug")
-async def debug_scrape_google_scholar(db: Session = Depends(get_db)):
-    lecturers = db.query(User.name, User.id, Author.sinta_profile_url)\
-                  .join(Author)\
-                  .all()
-
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    all_results = []
-    total_scraped = 0
-
-    for lecturer_name, user_id, profile_link in lecturers:
-        if not profile_link:
-            continue
-
-        scholar_url = f"{profile_link}?view=google_scholar"
-        response = requests.get(scholar_url, headers=headers)
-        if response.status_code != 200:
-            continue
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-        articles = soup.find_all('div', class_='ar-list-item mb-5')
-
-        for item in articles:
-            title_tag = item.find('div', class_='ar-title').find('a')
-            title = title_tag.text.strip() if title_tag else 'N/A'
-            article_url = title_tag['href'] if title_tag and title_tag.has_attr('href') else 'N/A'
-
-            author_names = []
-            author_order = None
-            meta_divs = item.find_all('div', class_='ar-meta')
-            for div in meta_divs:
-                tag = div.find('a', href='#!')
-                if tag and "Authors :" in tag.text:
-                    raw = tag.text.split("Authors :")[-1]
-                    author_names = [a.strip() for a in raw.split(',') if a.strip() and "..." not in a]
-                    lecturer_keys = lecturer_name.lower().split()
-                    for idx, name in enumerate(author_names):
-                        if any(key in name.lower() for key in lecturer_keys if len(key) > 2):
-                            author_order = idx + 1
-                            break
-                    break
-
-            journal_category = 'N/A'
-            jc_tag = item.find('div', class_='ar-meta').find('a', class_='ar-pub')
-            if jc_tag:
-                journal_category = jc_tag.text.strip()
-
-            year, cited = 'N/A', 'N/A'
-            if len(meta_divs) > 1:
-                for a_tag in meta_divs[1].find_all('a', href='#!'):
-                    icon = a_tag.find('i')
-                    if icon:
-                        classes = icon.get('class', [])
-                        if 'zmdi-calendar' in classes:
-                            year = a_tag.text.replace('📅', '').strip()
-                        elif 'zmdi-comment-list' in classes:
-                            cited = a_tag.text.replace('🔗', '').strip()
-
-            all_results.append({
-                "lecturer": lecturer_name,
-                "title": title,
-                "article_url": article_url,
-                "authors": author_names,
-                "journal_category": journal_category,
-                "year": year,
-                "citation_count": cited,
-                "author_order": author_order
-            })
-            total_scraped += 1
-
-    return {
-        "total_articles_scraped": total_scraped,
-        "results": all_results
-    }
 
 
 

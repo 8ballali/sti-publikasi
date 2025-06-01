@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from schemas import  ArticleAuthorItem, ArticleWithAuthorsResponse, AuthorDetailResponse, SubjectItem
+from schemas import  ArticleAuthorItem, ArticleWithAuthorsResponse, AuthorDetailResponse, SubjectItem, ArticleResponse, ResearchResponse
 from typing import List
 from models import PublicationAuthor, Article, User
 from sqlalchemy.orm import Session
@@ -15,7 +15,6 @@ router = APIRouter(
 
 @router.get("/search/authors", response_model=List[AuthorDetailResponse])
 def search_authors_by_name(name: str, db: Session = Depends(get_db)):
-    # Case-insensitive search
     users = db.query(User).filter(func.lower(User.name).like(f"%{name.lower()}%")).all()
 
     if not users:
@@ -27,11 +26,54 @@ def search_authors_by_name(name: str, db: Session = Depends(get_db)):
         if not author:
             continue
 
-        # Ambil semua subject yang terkait
-        subject_items = [
-            SubjectItem(id=us.subject.id, name=us.subject.name)
-            for us in author.subjects if us.subject
+        # Subjects
+        subjects = [
+            us.subject.name
+            for us in author.subjects
+            if us.subject and us.subject.name
         ]
+
+        # Articles
+        articles = [
+            ArticleResponse(
+                id=pa.article.id,
+                title=pa.article.title,
+                year=pa.article.year,
+                journal=pa.article.journal,
+                source=pa.article.source,
+                article_url=pa.article.article_url,
+                author_order=pa.author_order
+            )
+            for pa in author.publications if pa.article
+        ]
+
+        # Researches
+        researches = []
+        for ra in author.research:
+            research = ra.research
+            if not research:
+                continue
+
+            # Get leader and personils
+            leader_name = None
+            personils = []
+
+            for r_auth in research.authors:
+                if r_auth.is_leader:
+                    leader_name = r_auth.author.user.name if r_auth.author and r_auth.author.user else "Unknown"
+                elif r_auth.author and r_auth.author.user:
+                    personils.append(r_auth.author.user.name)
+
+            researches.append(ResearchResponse(
+                title=research.title,
+                leader=leader_name or "Unknown",
+                jenis_penelitian=research.fund_type or "-",
+                personils=", ".join(personils) if personils else None,
+                year=str(research.year) if research.year else None,
+                dana_penelitian=f"Rp{int(research.fund):,}" if research.fund else "-",
+                status_penelitian=research.fund_status or "-",
+                sumber_pendanaan=research.fund_source or "-"
+            ))
 
         results.append(AuthorDetailResponse(
             id=author.id,
@@ -41,10 +83,13 @@ def search_authors_by_name(name: str, db: Session = Depends(get_db)):
             sinta_score_total=author.sinta_score_total,
             affil_score_3yr=author.affil_score_3yr,
             affil_score_total=author.affil_score_total,
-            subjects=subject_items
+            subjects=subjects,
+            articles=articles,
+            researches=researches
         ))
 
     return results
+
 
 
 @router.get("/search/articles", response_model=List[ArticleWithAuthorsResponse])
