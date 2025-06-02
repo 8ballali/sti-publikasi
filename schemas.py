@@ -74,8 +74,8 @@ class ResearchResponse(BaseModel):
     leader: str
     jenis_penelitian: str
     personils: Optional[str]
-    year: Optional[str]
-    dana_penelitian: str
+    year: Optional[int]
+    dana_penelitian: int
     status_penelitian: str
     sumber_pendanaan: str
 
@@ -115,6 +115,15 @@ class ArticleWithAuthorsResponse(BaseModel):
 
 class SubjectItem(BaseModel):
     name: Optional[str]
+
+class AuthorSearchResponse(BaseModel):
+    id: int
+    name: str
+    articles: List[ArticleResponse]
+    researches: List[ResearchResponse]
+
+    class Config:
+        orm_mode = True
 
 class AuthorDetailResponse(BaseModel):
     id: int

@@ -67,7 +67,7 @@ class Research(Base):
     __tablename__ = "research"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
-    fund = Column(Float)
+    fund = Column(Integer)
     fund_status = Column(String(255))
     fund_source = Column(String(255))
     fund_type = Column(String(255))
