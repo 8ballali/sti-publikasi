@@ -22,26 +22,6 @@ router = APIRouter(
     tags=['Garuda']
 )
 
-@router.get("/scrape/garuda")
-async def scrape_garuda_route(db: Session = Depends(get_db)):
-    lecturers = get_lecturers_with_profiles(db)
-    all_results = []
-
-    for lecturer_name, profile_link in lecturers:
-        if not profile_link:
-            continue
-        print(f"Scraping data for: {lecturer_name}")
-        scraped_papers = garuda_scrapping(lecturer_name, profile_link)
-        print(f"Scraped {len(scraped_papers)} papers for {lecturer_name}")
-        save_scraped_data_to_db(scraped_papers, db)
-        all_results.extend(scraped_papers)
-
-    return {
-        "success": True,
-        "message": "Scraping Garuda Success",
-        "total_scraped": len(all_results),
-        "scraped_results": all_results
-    }
 
 @router.post("/upload/garuda")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):

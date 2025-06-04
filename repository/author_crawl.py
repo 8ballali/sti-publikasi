@@ -25,6 +25,7 @@ def scrape_and_save_authors(db: Session):
 
 def scrape_sinta():
     results = []
+
     for page in range(1, 8):  # Ganti sesuai kebutuhan
         url = f"{BASE_URL}?page={page}"
         response = requests.get(url, headers=HEADERS)
@@ -37,6 +38,8 @@ def scrape_sinta():
                 name_tag = author.find("a")
                 name = name_tag.get_text(strip=True) if name_tag else "N/A"
                 profile_link = name_tag["href"] if name_tag else "N/A"
+                full_profile_link = f"https://sinta.kemdikbud.go.id{profile_link}" if profile_link.startswith('/') else profile_link
+
                 sinta_id_tag = author.find("div", class_="profile-id")
                 sinta_id = sinta_id_tag.get_text(strip=True).replace("ID : ", "") if sinta_id_tag else "N/A"
 
@@ -52,21 +55,39 @@ def scrape_sinta():
                 affil_score_3yr = score_blocks[2].get_text(strip=True) if len(score_blocks) >= 4 else "0"
                 affil_score_total = score_blocks[3].get_text(strip=True) if len(score_blocks) >= 4 else "0"
 
+                # === Ambil department dari halaman profil dosen ===
+                department_name = "N/A"
+                try:
+                    profile_resp = requests.get(full_profile_link, headers=HEADERS)
+                    if profile_resp.status_code == 200:
+                        profile_soup = BeautifulSoup(profile_resp.content, "html.parser")
+                        meta_div = profile_soup.find("div", class_="meta-profile")
+                        if meta_div:
+                            dept_tag = meta_div.find("a", href=lambda x: x and "/departments/profile/" in x)
+                            if dept_tag:
+                                department_name = dept_tag.get_text(strip=True)
+                except Exception as e:
+                    print(f"Gagal ambil department dari {full_profile_link}: {e}")
+
+                # === Tambahkan ke hasil ===
                 results.append(
                     CrawlAuthors(
                         lecturer_name=name,
-                        sinta_profile_url=profile_link,
+                        sinta_profile_url=full_profile_link,
                         sinta_id=sinta_id,
-                        profile_link=profile_link,
+                        profile_link=full_profile_link,
                         scopus_hindex=scopus_hindex,
                         gs_hindex=gs_hindex,
                         sinta_score_3yr=sinta_score_3yr,
                         sinta_score_total=sinta_score_total,
                         affil_score_3yr=affil_score_3yr,
-                        affil_score_total=affil_score_total
+                        affil_score_total=affil_score_total,
+                        department=department_name
                     )
                 )
-                time.sleep(1)
+
+                time.sleep(1)  # delay antar request agar tidak membanjiri server
+
     return results
 
 def get_or_create_user(db: Session, name: str):
@@ -100,7 +121,10 @@ def save_scraped_data(scraped_data: list, db: Session):
             sinta_score_total=str(data.sinta_score_total),
             affil_score_3yr=str(data.affil_score_3yr),
             affil_score_total=str(data.affil_score_total),
+            department=str(data.department),
         )
+
+
         db.add(author)
         saved += 1
 

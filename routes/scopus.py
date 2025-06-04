@@ -28,29 +28,6 @@ router = APIRouter(
     tags=['Scopus']
 )
 
-
-@router.get("/scrape/scopus")
-async def scrape_scopus(db: Session = Depends(get_db)):
-    results = []
-
-    # Mengambil data dosen dari database
-    lecturers = db.query(User.name, Author.sinta_profile_url).select_from(User).join(Author).all()
-    print(f"Jumlah dosen: {len(lecturers)}")
-
-    for lecturer_name, profile_link in lecturers:
-        if profile_link:
-            print(f"Memproses dosen: {lecturer_name}")
-
-            scraped_data = scopus_scrapping(lecturer_name, profile_link)
-            print(f"Jumlah data yang di-scrape: {len(scraped_data)}")
-
-            scopus_data(scraped_data, db)
-
-            results.extend(scraped_data)
-
-    return {"message": "Scraping Scopus selesai dan data telah disimpan ke database!"}
-
-
 @router.get("/sync/scopus")
 async def sync_scopus(db: Session = Depends(get_db)):
     results = []

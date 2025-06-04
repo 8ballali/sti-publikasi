@@ -17,6 +17,7 @@ class CrawlAuthors(BaseModel):
     sinta_score_total: str
     affil_score_3yr: str
     affil_score_total: str
+    department: str
 
 
 class UserCreate(BaseModel):
@@ -78,6 +79,8 @@ class ResearchResponse(BaseModel):
     dana_penelitian: int
     status_penelitian: str
     sumber_pendanaan: str
+    author_name:str
+    author_id: int
 
     class Config:
         orm_mode = True
@@ -91,11 +94,15 @@ class ArticleAuthorItem(BaseModel):
 class ArticleResponse(BaseModel):
     id: int
     title: str
+    abstract: Optional[str] = None
     year: Optional[int]
     article_url: Optional[str]
     journal: Optional[str]
+    doi: Optional[str] = None
     source: Optional[str]
     author_order: Optional[int]
+    author_name: str
+    author_id: int
 
     class Config:
         orm_mode = True

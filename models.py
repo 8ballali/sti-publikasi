@@ -21,6 +21,7 @@ class Author(Base):
     affil_score_total = Column(String(255), nullable=True)
     scopus_hindex = Column(String(255), nullable=True)
     gs_hindex = Column(String(255), nullable=True)
+    department = Column(String(255))
 
 
     user = relationship("User", back_populates="author")
