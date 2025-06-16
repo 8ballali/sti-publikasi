@@ -8,7 +8,6 @@ from schemas import CrawlAuthors, TopAuthorResponse
 
 BASE_URL = "https://sinta.kemdikbud.go.id/departments/authors/20/896879FE-5FBE-4AB0-A7CD-3FAD1EEE3CFF/6635C54C-E05B-4161-A443-BCCA6926474A"
 
-# User-Agent agar tidak terdeteksi sebagai bot
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
