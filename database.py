@@ -3,12 +3,20 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 import os
 
+# Load dari file .env
+load_dotenv()
 
+# Ambil dari environment
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
 
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost/sti_publikasi"
+# Buat URL database
+SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
+# Buat engine
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
 
 # Buat session factory
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

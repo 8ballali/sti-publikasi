@@ -76,8 +76,6 @@ def search_articles(
         }
     )
 
-
-
 @router.get("/search/researches", response_model=StandardResponse)
 def search_researches(
     name: str = Query(..., description="Author name to search"),
