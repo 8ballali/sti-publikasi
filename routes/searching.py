@@ -155,18 +155,35 @@ def search_researches(
 
 
 
+from fastapi import Query
+
 @router.get("/authors/{author_id}", response_model=StandardResponse)
-def get_author_detail(author_id: int, db: Session = Depends(get_db)):
+def get_author_detail(
+    author_id: int,
+    db: Session = Depends(get_db),
+    article_page: int = Query(1, ge=1),
+    article_limit: int = Query(10, ge=1, le=100),
+    research_page: int = Query(1, ge=1),
+    research_limit: int = Query(10, ge=1, le=100)
+):
     author = db.query(Author).filter(Author.id == author_id).first()
     if not author:
         return StandardResponse(success=False, message="Author not found", data=None)
 
     user = author.user
-
     subjects = [us.subject.name for us in author.subjects if us.subject]
 
+    # ==== ARTICLES with pagination ====
+    sorted_publications = sorted(
+        author.publications,
+        key=lambda x: (x.author_order if x.author_order is not None else 9999)
+    )
+    article_start = (article_page - 1) * article_limit
+    article_end = article_start + article_limit
+    paginated_articles = sorted_publications[article_start:article_end]
+
     articles = []
-    for pa in sorted(author.publications, key=lambda x: (x.author_order if x.author_order is not None else 9999)):
+    for pa in paginated_articles:
         a = pa.article
         if a:
             articles.append(ArticleResponse(
@@ -176,11 +193,19 @@ def get_author_detail(author_id: int, db: Session = Depends(get_db)):
                 article_url=a.article_url,
                 journal=a.journal,
                 source=a.source,
-                author_order=pa.author_order
+                author_order=pa.author_order,
+                author_id=pa.author.id,
+                author_name=pa.author.user.name if pa.author and pa.author.user else "Unknown"
             ))
 
+    # ==== RESEARCHES with pagination ====
+    all_researches = author.research
+    research_start = (research_page - 1) * research_limit
+    research_end = research_start + research_limit
+    paginated_researches = all_researches[research_start:research_end]
+
     researches = []
-    for ra in author.research:
+    for ra in paginated_researches:
         r = ra.research
         if not r:
             continue
@@ -202,7 +227,9 @@ def get_author_detail(author_id: int, db: Session = Depends(get_db)):
             year=r.year,
             dana_penelitian=r.fund,
             status_penelitian=r.fund_status,
-            sumber_pendanaan=r.fund_source
+            sumber_pendanaan=r.fund_source,
+            author_id=author.id,
+            author_name=user.name
         ))
 
     author_detail = AuthorDetailResponse(
@@ -223,7 +250,6 @@ def get_author_detail(author_id: int, db: Session = Depends(get_db)):
         message="Authors fetched successfully",
         data=author_detail
     )
-
 
 @router.get("/articles", response_model=StandardResponse)
 def get_all_articles(

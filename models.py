@@ -39,7 +39,7 @@ class Article(Base):
     accred = Column(String(255), nullable=True)
     abstract = Column(Text)
     citation_count = Column(Integer, nullable=True)
-    article_url = Column(Text)
+    article_url = Column(Text, nullable=True)
     journal = Column(String(255))
     source = Column(String(255))
     university = Column(String(255))

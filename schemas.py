@@ -101,8 +101,8 @@ class ArticleResponse(BaseModel):
     doi: Optional[str] = None
     source: Optional[str]
     author_order: Optional[int]
-    author_name: str
-    author_id: int
+    author_name: Optional[str] = None
+    author_id: Optional[int] = None
 
     class Config:
         orm_mode = True
