@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from database import engine
 import models
+import os
 from routes import authors,garuda,scholar,scopus, database, searching, researches,stats
 
 from sqlalchemy.orm import Session
@@ -9,6 +10,9 @@ app = FastAPI()
 
 # Buat tabel di database jika belum ada
 models.Base.metadata.create_all(bind=engine)
+
+print("✅ Loaded DB HOST:", os.getenv("DB_HOST"))
+
 
 
 app = FastAPI()

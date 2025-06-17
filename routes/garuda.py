@@ -45,6 +45,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         university = str(row.get("Universitas", "")).strip()
         sinta_id_excel = str(row.get("User ID", "")).strip()
         author_order = str(row.get("Order", "")).strip()
+        abstract = str(row.get("Abstract", "")).strip()
 
         # Bersihkan Accred
         accred = index_jurnal.replace("Accred :", "", 1).strip() if index_jurnal.lower().startswith("accred") else index_jurnal
@@ -64,7 +65,8 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
                 accred=accred,
                 journal=journal,
                 source="GARUDA",
-                university=university
+                university=university,
+                abstract=abstract
             )
             db.add(article)
             db.commit()
