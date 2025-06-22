@@ -73,6 +73,7 @@ class Research(Base):
     fund_source = Column(String(255))
     fund_type = Column(String(255))
     year = Column(Integer)
+    leader_name = Column(String(255), nullable=True)
     authors = relationship("ResearcherAuthor", back_populates="research")
 
 class ResearcherAuthor(Base):

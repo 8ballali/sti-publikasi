@@ -20,14 +20,3 @@ def reset_all():
         return {"message": "Database reset: structure and data cleared."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/reset-database")
-def reset_database(db: Session = Depends(get_db)):
-    try:
-        for table in reversed(Base.metadata.sorted_tables):
-            db.execute(table.delete())
-        db.commit()
-        return {"message": "All data deleted successfully."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
