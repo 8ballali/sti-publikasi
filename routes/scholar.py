@@ -70,7 +70,7 @@ def normalize(text: str) -> str:
 
     return text
 
-@router.post("/google-scholar/upload/all-in-one")
+@router.post("/upload/google-scholar")
 async def upload_google_scholar_single_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)

@@ -147,8 +147,9 @@ def get_top_authors(db: Session, limit: int = 10):
     )
 
     top_authors = []
-    for r in results:
+    for idx, r in enumerate(results, start=1):  # ⬅️ mulai dari rank 1
         top_authors.append({
+            "rank": idx,
             "author_id": r.author_id,
             "name": r.name or "-",
             "article_count": r.article_count or 0

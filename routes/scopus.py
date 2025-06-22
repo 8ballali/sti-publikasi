@@ -21,11 +21,8 @@ from models import PublicationAuthor
 from sqlalchemy import and_
 
 
-
-router = APIRouter()
-
 router = APIRouter(
-    tags=['Scopus']
+    tags=['Scopus Data']
 )
 
 @router.get("/sync/scopus")
@@ -66,8 +63,8 @@ def normalize(text: str) -> str:
 
     return text
 
-@router.post("/upload/scopus-excel")
-async def upload_scopus_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+@router.post("/upload/scopus")
+async def upload_scopus(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.endswith(('.xls', '.xlsx', '.csv')):
         return {"error": "Format file harus Excel (.xls/.xlsx) atau CSV"}
 
@@ -82,7 +79,7 @@ async def upload_scopus_excel(file: UploadFile = File(...), db: Session = Depend
         accred = str(row.get("Accred", "")).strip()
         journal = str(row.get("Jurnal", "")).strip()
         year = str(row.get("Year", "")).strip()
-        cited = row.get("Cited", None)
+        cited = str(row.get("Cited", "")).strip()
         author_order = row.get("Order", None)
         abstract = str(row.get("Abstract", "")).strip()
         article_url = str(row.get("Publisher Link", "")).strip()
@@ -99,7 +96,7 @@ async def upload_scopus_excel(file: UploadFile = File(...), db: Session = Depend
 
         # Cek apakah artikel sudah ada berdasarkan title + source
         article = db.query(Article).filter(
-            and_(Article.title == title, Article.source == "SCOPUS")
+            and_(Article.title == title)
         ).first()
 
         if not article:
@@ -110,7 +107,7 @@ async def upload_scopus_excel(file: UploadFile = File(...), db: Session = Depend
                 accred=accred,
                 journal=journal,
                 source="SCOPUS",
-                citation_count=int(cited) if pd.notna(cited) and str(cited).isdigit() else None,
+                citation_count=int(cited) if cited.isdigit() else None,
                 abstract=abstract,
                 article_url=article_url,
                 doi=doi

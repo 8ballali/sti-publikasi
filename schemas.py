@@ -99,6 +99,7 @@ class ArticleResponse(BaseModel):
     article_url: Optional[str]
     journal: Optional[str]
     doi: Optional[str] = None
+    citation_count: Optional[int] = None
     source: Optional[str]
     author_order: Optional[int]
     author_name: Optional[str] = None
