@@ -26,6 +26,9 @@ def get_article_stats_by_source(
         if year_range > 0:
             min_year = current_year - year_range + 1
             query = query.filter(Article.year >= min_year)
+            range_desc = f"sejak tahun {min_year}"
+        elif year_range == 0:
+            range_desc = "seluruh tahun"
 
         count = query.scalar() or 0
 
@@ -35,7 +38,7 @@ def get_article_stats_by_source(
 
     return StandardResponse(
         success=True,
-        message="Statistik jumlah artikel berdasarkan sumber berhasil diambil.",
+        message=f"Statistik jumlah artikel berdasarkan sumber {range_desc} berhasil diambil.",
         data=result
     )
 
