@@ -55,11 +55,14 @@ def get_research_stats(
     if year_range > 0:
         min_year = current_year - year_range + 1
         query = query.filter(Research.year >= min_year)
+        range_desc = f"sejak tahun {min_year}"
+    else:
+        range_desc = "untuk semua tahun"
 
     count = query.scalar() or 0
 
     return StandardResponse(
         success=True,
-        message=f"Statistik jumlah penelitian {f'{year_range} tahun terakhir' if year_range > 0 else '(semua tahun)'} berhasil diambil.",
+        message=f"Statistik jumlah penelitian {range_desc} berhasil diambil.",
         data={"total_researches": count}
     )
