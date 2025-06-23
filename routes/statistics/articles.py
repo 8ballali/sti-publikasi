@@ -13,33 +13,33 @@ router = APIRouter(
 
 @router.get("/stats/articles/source", response_model=StandardResponse)
 def get_article_stats_by_source(
-    year_range: int = Query(0, ge=0, le=10, description="0=all years, 1=last year, 3=last 3 years, 6=last 6 years"),
+    year_range: int = Query(6, ge=1, le=10, description="Rentang tahun ke belakang (default: 6 tahun)"),
     db: Session = Depends(get_db)
 ):
     current_year = datetime.now().year
+    start_year = current_year - year_range + 1
     sources = ["SCOPUS", "GARUDA"]
     result = {}
 
     for source in sources:
-        query = db.query(func.count(Article.id)).filter(Article.source.ilike(f"%{source}%"))
+        source_label = "SINTA" if source == "GARUDA" else source
+        yearly_data = {}
 
-        if year_range > 0:
-            min_year = current_year - year_range + 1
-            query = query.filter(Article.year >= min_year)
-            range_desc = f"sejak tahun {min_year}"
-        elif year_range == 0:
-            range_desc = "seluruh tahun"
+        for year in range(current_year, start_year - 1, -1):  # dari tahun sekarang mundur
+            count = (
+                db.query(func.count(Article.id))
+                .filter(Article.source.ilike(f"%{source}%"), Article.year == year)
+                .scalar()
+            )
+            yearly_data[str(year)] = count or 0
 
-        count = query.scalar() or 0
-
-        # Ganti label "GARUDA" jadi "SINTA" untuk frontend
-        label = "SINTA" if source == "GARUDA" else source
-        result[label] = count
+        result[source_label] = yearly_data
 
     return StandardResponse(
         success=True,
-        message=f"Statistik jumlah artikel berdasarkan sumber {range_desc} berhasil diambil.",
+        message=f"Statistik jumlah artikel per tahun berdasarkan sumber sejak tahun {start_year} berhasil diambil.",
         data=result
     )
+
 
 
