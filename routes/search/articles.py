@@ -253,7 +253,7 @@ def search_articles_by_title(
 
 
 
-@router.get("/article/{article_id}", response_model=StandardResponse)
+@router.get("/articles/{article_id}", response_model=StandardResponse)
 def get_article_detail(
     article_id: int = Path(..., description="ID artikel publikasi"),
     db: Session = Depends(get_db)
