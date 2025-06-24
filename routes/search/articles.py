@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from schemas import  ArticleResponse
 from repository.author_crawl import get_top_authors
 from typing import Optional
@@ -55,6 +55,7 @@ def get_all_articles(
         ArticleResponse(
             id=pa.article.id,
             title=pa.article.title,
+            accred=pa.article.accred,
             abstract=pa.article.abstract,
             year=pa.article.year,
             article_url=pa.article.article_url,
@@ -144,6 +145,7 @@ def search_articles_by_authors(
             id=item["article"].id,
             title=item["article"].title,
             year=item["article"].year,
+            accred=item["article"].accred,
             doi=item["article"].doi,
             article_url=item["article"].article_url,
             journal=item["article"].journal,
@@ -226,6 +228,7 @@ def search_articles_by_title(
         articles.append(ArticleResponse(
             id=article.id,
             title=article.title,
+            accred=article.accred,
             year=article.year,
             doi=article.doi,
             article_url=article.article_url,
@@ -245,4 +248,41 @@ def search_articles_by_title(
             "total": total,
             "articles": articles
         }
+    )
+
+
+
+
+@router.get("/article/{article_id}", response_model=StandardResponse)
+def get_article_detail(
+    article_id: int = Path(..., description="ID artikel publikasi"),
+    db: Session = Depends(get_db)
+):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    # Ambil relasi ke author pertama (jika ada)
+    pa = next((pa for pa in article.authors if pa.author and pa.author.user), None)
+
+    response_data = ArticleResponse(
+        id=article.id,
+        title=article.title,
+        accred=article.accred,
+        abstract=article.abstract,
+        year=article.year,
+        article_url=article.article_url,
+        journal=article.journal,
+        doi=article.doi,
+        citation_count=article.citation_count,
+        source=article.source,
+        author_order=pa.author_order if pa else None,
+        author_name=pa.author.user.name if pa and pa.author and pa.author.user else None,
+        author_id=pa.author.id if pa and pa.author else None
+    )
+
+    return StandardResponse(
+        success=True,
+        message="Detail artikel berhasil diambil.",
+        data=response_data
     )
