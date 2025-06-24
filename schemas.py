@@ -94,6 +94,7 @@ class ArticleAuthorItem(BaseModel):
 class ArticleResponse(BaseModel):
     id: int
     title: str
+    accred: Optional[str] = None
     abstract: Optional[str] = None
     year: Optional[int]
     article_url: Optional[str]

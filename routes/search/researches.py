@@ -5,7 +5,7 @@ from typing import Optional
 from models import Author,User, PublicationAuthor, Article, Research
 from sqlalchemy.orm import Session
 from database import get_db
-from sqlalchemy import func
+from sqlalchemy import func, case
 from schemas import StandardResponse
 from fastapi import Query
 
@@ -22,8 +22,7 @@ def paginate_query(query, page: int, limit: int):
 def get_all_researches(
     min_year: Optional[int] = Query(None, description="Tahun minimal"),
     max_year: Optional[int] = Query(None, description="Tahun maksimal"),
-    min_fund: Optional[float] = Query(None, description="Dana minimal"),
-    max_fund: Optional[float] = Query(None, description="Dana maksimal"),
+    termahal: bool = Query(False, description="Urutkan berdasarkan dana terbanyak"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
@@ -35,24 +34,24 @@ def get_all_researches(
     if max_year is not None:
         query = query.filter(Research.year <= max_year)
 
-    if min_fund is not None:
-        query = query.filter(Research.fund >= min_fund)
-    if max_fund is not None:
-        query = query.filter(Research.fund <= max_fund)
+    # Sorting
+    if termahal:
+        query = query.order_by(
+            case((Research.fund == None, 1), else_=0),
+            Research.fund.desc()
+        )
+    else:
+        query = query.order_by(
+            case((Research.year == None, 1), else_=0),
+            Research.year.desc()
+        )
 
-    researches_list = query.all()
-    total = len(researches_list)
 
-    # Sorting by year descending
-    researches_list.sort(key=lambda x: x.year if x.year else 0, reverse=True)
-
-    # Pagination
-    start = (page - 1) * limit
-    end = start + limit
-    paginated = researches_list[start:end]
+    total = query.count()
+    researches_list = query.offset((page - 1) * limit).limit(limit).all()
 
     result = []
-    for research in paginated:
+    for research in researches_list:
         # Cari leader
         leader = next(
             (r.author.user.name for r in research.authors if r.is_leader and r.author and r.author.user),
@@ -96,13 +95,13 @@ def get_all_researches(
     )
 
 
+
 @router.get("/search/researches/authors", response_model=StandardResponse)
 def search_researches_by_authors(
     name: str = Query(..., description="Author name to search"),
     min_year: Optional[int] = Query(None, description="Minimum year"),
     max_year: Optional[int] = Query(None, description="Maximum year"),
-    min_fund: Optional[float] = Query(None, description="Minimum fund"),
-    max_fund: Optional[float] = Query(None, description="Maximum fund"),
+    termahal: bool = Query(False, description="Sort by highest fund"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
@@ -122,16 +121,10 @@ def search_researches_by_authors(
             if not research:
                 continue
 
-            # Terapkan filter tahun
+            # Filter tahun
             if min_year is not None and (not research.year or research.year < min_year):
                 continue
             if max_year is not None and (not research.year or research.year > max_year):
-                continue
-
-            # Terapkan filter dana
-            if min_fund is not None and (not research.fund or research.fund < min_fund):
-                continue
-            if max_fund is not None and (not research.fund or research.fund > max_fund):
                 continue
 
             # Nama leader
@@ -155,9 +148,22 @@ def search_researches_by_authors(
             })
 
     total = len(researches_raw)
+    
+    # Sorting
+    if termahal:
+        researches_raw.sort(
+            key=lambda x: x["research"].fund if x["research"].fund is not None else -1,
+            reverse=True
+        )
+    else:
+        researches_raw.sort(
+            key=lambda x: x["research"].year if x["research"].year else 0,
+            reverse=True
+        )
+
+    # Pagination
     start = (page - 1) * limit
     end = start + limit
-    researches_raw.sort(key=lambda x: x["research"].year if x["research"].year else 0, reverse=True)
     paginated = researches_raw[start:end]
 
     researches = [
@@ -186,6 +192,7 @@ def search_researches_by_authors(
             "researches": researches
         }
     )
+
 
 
 

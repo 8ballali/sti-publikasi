@@ -41,5 +41,3 @@ def get_article_stats_by_source(
         data=result
     )
 
-
-
