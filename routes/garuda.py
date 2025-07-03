@@ -54,7 +54,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
             article_url=url,
             accred=accred,
             journal=journal,
-            source="GARUDA",
+            source="SINTA",
             university=university,
             abstract=abstract
         )
