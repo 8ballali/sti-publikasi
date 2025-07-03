@@ -20,7 +20,7 @@ def paginate_query(query, page: int, limit: int):
 
 @router.get("/articles", response_model=StandardResponse)
 def get_all_articles(
-    source: Optional[str] = Query(None, description="Filter by source: SCOPUS, GARUDA"),
+    source: Optional[str] = Query(None, description="Filter by source: SCOPUS, SINTA"),
     min_year: Optional[int] = Query(None, description="Minimum year"),
     max_year: Optional[int] = Query(None, description="Maximum year"),
     sort_by_citation: bool = Query(False, description="Sort by citation_count descending"),
@@ -85,7 +85,7 @@ def get_all_articles(
 @router.get("/search/articles/authors", response_model=StandardResponse)
 def search_articles_by_authors(
     name: str = Query(..., description="Author name to search"),
-    source: Optional[str] = Query(None, description="Filter by source: SCOPUS, GARUDA"),
+    source: Optional[str] = Query(None, description="Filter by source: SCOPUS, SINTA"),
     min_year: Optional[int] = Query(None),
     max_year: Optional[int] = Query(None),
     sort_by_citation: Optional[bool] = Query(False, description="Sort by citation count"),
@@ -173,7 +173,7 @@ def search_articles_by_authors(
 @router.get("/search/articles/title", response_model=StandardResponse)
 def search_articles_by_title(
     title: str = Query(..., description="Judul artikel yang ingin dicari"),
-    source: Optional[str] = Query(None, description="Filter by source: SCOPUS, GARUDA"),
+    source: Optional[str] = Query(None, description="Filter by source: SCOPUS, SINTA"),
     min_year: Optional[int] = Query(None),
     max_year: Optional[int] = Query(None),
     sort_by_citation: Optional[bool] = Query(False, description="Urutkan berdasarkan jumlah sitasi"),

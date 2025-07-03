@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from schemas import AuthorDetailResponse, ArticleResponse, ResearchResponse
 from repository.author_crawl import get_top_authors
-from typing import Optional
+from typing import Optional, Literal
 from models import Author,User, PublicationAuthor, Article, Research
 from sqlalchemy.orm import Session
 from database import get_db
@@ -23,6 +23,9 @@ def get_all_researches(
     min_year: Optional[int] = Query(None, description="Tahun minimal"),
     max_year: Optional[int] = Query(None, description="Tahun maksimal"),
     termahal: bool = Query(False, description="Urutkan berdasarkan dana terbanyak"),
+    fund_source: Optional[
+        Literal["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+    ] = Query(None, description="Sumber dana penelitian"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
@@ -33,6 +36,9 @@ def get_all_researches(
         query = query.filter(Research.year >= min_year)
     if max_year is not None:
         query = query.filter(Research.year <= max_year)
+
+    if fund_source:
+        query = query.filter(Research.fund_source == fund_source)
 
     # Sorting
     if termahal:
@@ -46,25 +52,19 @@ def get_all_researches(
             Research.year.desc()
         )
 
-
     total = query.count()
     researches_list = query.offset((page - 1) * limit).limit(limit).all()
 
     result = []
     for research in researches_list:
-        # Cari leader
         leader = next(
             (r.author.user.name for r in research.authors if r.is_leader and r.author and r.author.user),
             "Unknown"
         )
-
-        # Cari personil
         personils = "; ".join([
             r.author.user.name for r in research.authors
             if r.author and r.author.user and not r.is_leader
         ])
-
-        # Cari nama author pertama
         first_author = next(
             (r.author for r in research.authors if r.author and r.author.user),
             None
@@ -80,7 +80,8 @@ def get_all_researches(
             leader=leader,
             personils=personils,
             author_name=first_author.user.name if first_author else "Unknown",
-            author_id=first_author.id if first_author else 0
+            author_id=first_author.id if first_author else 0,
+            leader_name=research.leader_name
         ))
 
     return StandardResponse(
@@ -94,13 +95,14 @@ def get_all_researches(
         }
     )
 
-
-
 @router.get("/search/researches/authors", response_model=StandardResponse)
 def search_researches_by_authors(
     name: str = Query(..., description="Author name to search"),
     min_year: Optional[int] = Query(None, description="Minimum year"),
     max_year: Optional[int] = Query(None, description="Maximum year"),
+    fund_source: Optional[
+        Literal["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+    ] = Query(None, description="Filter by fund source"),
     termahal: bool = Query(False, description="Sort by highest fund"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
@@ -125,6 +127,10 @@ def search_researches_by_authors(
             if min_year is not None and (not research.year or research.year < min_year):
                 continue
             if max_year is not None and (not research.year or research.year > max_year):
+                continue
+
+            # Filter fund source
+            if fund_source and research.fund_source != fund_source:
                 continue
 
             # Nama leader
@@ -193,20 +199,47 @@ def search_researches_by_authors(
         }
     )
 
-
-
-
 @router.get("/search/researches/title", response_model=StandardResponse)
 def search_researches_by_title(
     title: str = Query(..., description="Judul penelitian yang ingin dicari"),
+    min_year: Optional[int] = Query(None, description="Tahun minimal"),
+    max_year: Optional[int] = Query(None, description="Tahun maksimal"),
+    fund_source: Optional[
+        Literal["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+    ] = Query(None, description="Filter berdasarkan sumber pendanaan"),
+    termahal: bool = Query(False, description="Urutkan berdasarkan dana terbanyak"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    # Ambil semua research yang judulnya mirip
-    matched_researches = db.query(Research).filter(
+    # Query awal
+    query = db.query(Research).filter(
         func.lower(Research.title).like(f"%{title.lower()}%")
-    ).all()
+    )
+
+    # Filter tahun
+    if min_year is not None:
+        query = query.filter(Research.year >= min_year)
+    if max_year is not None:
+        query = query.filter(Research.year <= max_year)
+
+    # Filter sumber dana
+    if fund_source:
+        query = query.filter(Research.fund_source == fund_source)
+
+    # Sorting
+    if termahal:
+        query = query.order_by(
+            case((Research.fund == None, 1), else_=0),
+            Research.fund.desc()
+        )
+    else:
+        query = query.order_by(
+            case((Research.year == None, 1), else_=0),
+            Research.year.desc()
+        )
+
+    matched_researches = query.all()
 
     if not matched_researches:
         raise HTTPException(status_code=404, detail="Researches not found")
@@ -225,7 +258,7 @@ def search_researches_by_title(
             if r.author and r.author.user and not r.is_leader
         ])
 
-        # Ambil author pertama (boleh siapa saja)
+        # Ambil author pertama
         first_author = next(
             (r for r in research.authors if r.author and r.author.user),
             None
@@ -245,7 +278,6 @@ def search_researches_by_title(
     total = len(researches_raw)
     start = (page - 1) * limit
     end = start + limit
-    researches_raw.sort(key=lambda x: x["research"].year if x["research"].year else 0, reverse=True)
     paginated = researches_raw[start:end]
 
     # Format response
@@ -260,7 +292,8 @@ def search_researches_by_title(
             status_penelitian=item["research"].fund_status,
             sumber_pendanaan=item["research"].fund_source,
             author_name=item["author_name"],
-            author_id=item["author_id"]
+            author_id=item["author_id"],
+            leader_name=item["leader"]
         )
         for item in paginated
     ]
@@ -275,5 +308,4 @@ def search_researches_by_title(
             "researches": researches
         }
     )
-
 

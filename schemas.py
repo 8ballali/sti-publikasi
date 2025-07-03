@@ -81,6 +81,7 @@ class ResearchResponse(BaseModel):
     sumber_pendanaan: str
     author_name:str
     author_id: int
+    leader_name: Optional[str] = "Unknown"
 
     class Config:
         orm_mode = True
