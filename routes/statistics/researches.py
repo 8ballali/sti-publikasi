@@ -5,6 +5,7 @@ from database import get_db
 from schemas import StandardResponse  # pastikan diimport
 from sqlalchemy import func
 from datetime import datetime
+from collections import defaultdict
 
 router = APIRouter(
     tags=['Statistics Researches']
@@ -76,28 +77,25 @@ def get_research_total(
         years = list(range(min_year, current_year + 1))
         range_desc = f"sejak tahun {min_year}"
     else:
-        years = db.query(Research.year).distinct().filter(Research.year.isnot(None)).order_by(Research.year).all()
-        years = [y[0] for y in years]
+        year_tuples = db.query(Research.year).distinct().filter(Research.year.isnot(None)).order_by(Research.year).all()
+        years = [y[0] for y in year_tuples]
         range_desc = "untuk semua tahun"
 
-    result = {}
-    total = 0
+    # Query total count by fund_source and year
+    query = (
+        db.query(Research.fund_source, Research.year, func.count(Research.id))
+        .filter(Research.year.in_(years))
+        .group_by(Research.fund_source, Research.year)
+        .all()
+    )
 
-    for year in years:
-        count = (
-            db.query(func.count(Research.id))
-            .filter(Research.year == year)
-            .scalar() or 0
-        )
-        result[str(year)] = count
-        total += count
+    # Susun hasilnya ke dalam nested dict
+    result = defaultdict(dict)
+    for fund_source, year, count in query:
+        result[fund_source][str(year)] = count
 
     return StandardResponse(
         success=True,
-        message=f"Statistik jumlah penelitian {range_desc} berhasil diambil.",
-        data={
-            "per_year": result,
-            "total_researches": total
-        }
+        message=f"Statistik jumlah penelitian per tahun berdasarkan sumber {range_desc} berhasil diambil.",
+        data=result
     )
-
