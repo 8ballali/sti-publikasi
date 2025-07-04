@@ -18,23 +18,21 @@ def get_fund_statistics(
     year_range: int = Query(6, ge=0, le=10, description="Filter jumlah tahun terakhir (0 = semua tahun)"),
     db: Session = Depends(get_db)
 ):
-    sources = ["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+    sources = ["BIMA_SOURCE", "INTERNAL_SOURCE", "SIMLITABMAS_SOURCE"]
     current_year = datetime.now().year
 
     min_year = current_year - year_range + 1 if year_range > 0 else None
 
-    # Siapkan struktur hasil
     stats = {source: {} for source in sources}
     total_all_fund = 0
 
-    # Ambil daftar tahun yang tersedia
+    # Tahun yang akan digunakan
     years = (
         list(range(min_year, current_year + 1))
         if min_year else
         db.query(Research.year).distinct().filter(Research.year.isnot(None)).order_by(Research.year).all()
     )
 
-    # Pastikan years adalah list tahun integer
     if not isinstance(years[0], int):
         years = [y[0] for y in years]
 
@@ -43,7 +41,7 @@ def get_fund_statistics(
             query = db.query(
                 func.sum(Research.fund).label("total_fund")
             ).filter(
-                func.upper(Research.fund_source) == source,
+                Research.fund_source == source,
                 Research.year == year
             )
 
@@ -63,6 +61,8 @@ def get_fund_statistics(
             "total_all_fund": total_all_fund
         }
     )
+
+
 
 
 @router.get("/stats/research/total", response_model=StandardResponse)

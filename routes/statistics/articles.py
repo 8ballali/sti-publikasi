@@ -18,14 +18,13 @@ def get_article_stats_by_source(
 ):
     current_year = datetime.now().year
     start_year = current_year - year_range + 1
-    sources = ["SCOPUS", "GARUDA"]
+    sources = ["SCOPUS", "SINTA"]
     result = {}
 
     for source in sources:
-        source_label = "SINTA" if source == "GARUDA" else source
         yearly_data = {}
 
-        for year in range(current_year, start_year - 1, -1):  # dari tahun sekarang mundur
+        for year in range(current_year, start_year - 1, -1):
             count = (
                 db.query(func.count(Article.id))
                 .filter(Article.source.ilike(f"%{source}%"), Article.year == year)
@@ -33,11 +32,10 @@ def get_article_stats_by_source(
             )
             yearly_data[str(year)] = count or 0
 
-        result[source_label] = yearly_data
+        result[source] = yearly_data
 
     return StandardResponse(
         success=True,
         message=f"Statistik jumlah artikel per tahun berdasarkan sumber sejak tahun {start_year} berhasil diambil.",
         data=result
     )
-
