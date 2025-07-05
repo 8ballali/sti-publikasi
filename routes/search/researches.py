@@ -24,7 +24,7 @@ def get_all_researches(
     max_year: Optional[int] = Query(None, description="Tahun maksimal"),
     termahal: bool = Query(False, description="Urutkan berdasarkan dana terbanyak"),
     fund_source: Optional[
-        Literal["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+        Literal["INTERNAL_SOURCE", "BIMA_SOURCE", "SIMLITABMAS_SOURCE"]
     ] = Query(None, description="Sumber dana penelitian"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
@@ -57,16 +57,20 @@ def get_all_researches(
 
     result = []
     for research in researches_list:
-        leader = next(
-            (r.author.user.name for r in research.authors if r.is_leader and r.author and r.author.user),
-            "Unknown"
-        )
-        personils = "; ".join([
-            r.author.user.name for r in research.authors
-            if r.author and r.author.user and not r.is_leader
-        ])
+        leader = research.leader_name or "Unknown"
+
+        # Hindari duplikat nama personil dan pastikan bukan leader
+        personil_names = set()
+        for ra in research.authors:
+            if ra.author and ra.author.user:
+                name = ra.author.user.name
+                if name != leader:
+                    personil_names.add(name)
+        personils = "; ".join(sorted(personil_names))
+
+        # Author pertama (untuk identitas utama, bisa dari salah satu personil)
         first_author = next(
-            (r.author for r in research.authors if r.author and r.author.user),
+            (ra.author for ra in research.authors if ra.author and ra.author.user),
             None
         )
 
@@ -77,11 +81,10 @@ def get_all_researches(
             status_penelitian=research.fund_status,
             sumber_pendanaan=research.fund_source,
             jenis_penelitian=research.fund_type,
-            leader=leader,
+            leader_name=leader,
             personils=personils,
             author_name=first_author.user.name if first_author else "Unknown",
-            author_id=first_author.id if first_author else 0,
-            leader_name=research.leader_name
+            author_id=first_author.id if first_author else 0
         ))
 
     return StandardResponse(
@@ -95,13 +98,14 @@ def get_all_researches(
         }
     )
 
+
 @router.get("/search/researches/authors", response_model=StandardResponse)
 def search_researches_by_authors(
     name: str = Query(..., description="Author name to search"),
     min_year: Optional[int] = Query(None, description="Minimum year"),
     max_year: Optional[int] = Query(None, description="Maximum year"),
     fund_source: Optional[
-        Literal["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+        Literal["INTERNAL_SOURCE", "BIMA_SOURCE", "SIMLITABMAS_SOURCE"]
     ] = Query(None, description="Filter by fund source"),
     termahal: bool = Query(False, description="Sort by highest fund"),
     page: int = Query(1, ge=1),
@@ -133,17 +137,17 @@ def search_researches_by_authors(
             if fund_source and research.fund_source != fund_source:
                 continue
 
-            # Nama leader
-            leader = next(
-                (r.author.user.name for r in research.authors if r.is_leader and r.author and r.author.user),
-                "Unknown"
-            )
+            # Leader dari field langsung
+            leader = research.leader_name or "Unknown"
 
-            # Personil
-            personils = "; ".join([
-                r.author.user.name for r in research.authors
-                if r.author and r.author.user and not r.is_leader
-            ])
+            # Personils (hindari duplikat dan pengecualian leader)
+            personil_names = set()
+            for r in research.authors:
+                if r.author and r.author.user:
+                    name_ = r.author.user.name
+                    if name_ != leader:
+                        personil_names.add(name_)
+            personils = "; ".join(sorted(personil_names))
 
             researches_raw.append({
                 "research": research,
@@ -154,7 +158,7 @@ def search_researches_by_authors(
             })
 
     total = len(researches_raw)
-    
+
     # Sorting
     if termahal:
         researches_raw.sort(
@@ -199,20 +203,20 @@ def search_researches_by_authors(
         }
     )
 
+
 @router.get("/search/researches/title", response_model=StandardResponse)
 def search_researches_by_title(
     title: str = Query(..., description="Judul penelitian yang ingin dicari"),
     min_year: Optional[int] = Query(None, description="Tahun minimal"),
     max_year: Optional[int] = Query(None, description="Tahun maksimal"),
     fund_source: Optional[
-        Literal["INTERNAL SOURCE", "BIMA SOURCE", "SIMLITABMAS SOURCE"]
+        Literal["INTERNAL_SOURCE", "BIMA_SOURCE", "SIMLITABMAS_SOURCE"]
     ] = Query(None, description="Filter berdasarkan sumber pendanaan"),
     termahal: bool = Query(False, description="Urutkan berdasarkan dana terbanyak"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    # Query awal
     query = db.query(Research).filter(
         func.lower(Research.title).like(f"%{title.lower()}%")
     )
@@ -246,30 +250,28 @@ def search_researches_by_title(
 
     researches_raw = []
     for research in matched_researches:
-        # Ambil leader
-        leader = next(
-            (r.author.user.name for r in research.authors if r.is_leader and r.author and r.author.user),
-            "Unknown"
-        )
+        # Ambil leader dari field langsung
+        leader = research.leader_name or "Unknown"
 
-        # Personil
-        personils = "; ".join([
-            r.author.user.name for r in research.authors
-            if r.author and r.author.user and not r.is_leader
-        ])
+        # Ambil personil, hindari duplikat dan jangan tampilkan leader
+        personil_names = set()
+        for ra in research.authors:
+            if ra.author and ra.author.user:
+                name = ra.author.user.name
+                if name != leader:
+                    personil_names.add(name)
+        personils = "; ".join(sorted(personil_names))
 
-        # Ambil author pertama
+        # Ambil author pertama (siapa saja dari authors)
         first_author = next(
-            (r for r in research.authors if r.author and r.author.user),
+            (ra.author for ra in research.authors if ra.author and ra.author.user),
             None
         )
-        author_name = first_author.author.user.name if first_author else "Unknown"
-        author_id = first_author.author.id if first_author else None
 
         researches_raw.append({
             "research": research,
-            "author_name": author_name,
-            "author_id": author_id,
+            "author_name": first_author.user.name if first_author else "Unknown",
+            "author_id": first_author.id if first_author else 0,
             "leader": leader,
             "personils": personils
         })
