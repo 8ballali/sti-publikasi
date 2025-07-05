@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
-from schemas import  ArticleResponse
+from schemas import  ArticleResponse, ArticleAuthorResponse
 from repository.author_crawl import get_top_authors
 from typing import Optional
 from models import Author,User, PublicationAuthor, Article
@@ -28,7 +28,7 @@ def get_all_articles(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    query = db.query(PublicationAuthor).join(Article).join(Author).join(User)
+    query = db.query(Article)
 
     if source:
         query = query.filter(Article.source.ilike(f"%{source.upper()}%"))
@@ -39,7 +39,6 @@ def get_all_articles(
         query = query.filter(Article.year <= max_year)
 
     if sort_by_citation:
-        # MariaDB-compatible: sort NULLs last
         query = query.order_by(
             case((Article.citation_count == None, 1), else_=0),
             Article.citation_count.desc()
@@ -51,24 +50,30 @@ def get_all_articles(
 
     paginated = query.offset((page - 1) * limit).limit(limit).all()
 
-    articles_data = [
-        ArticleResponse(
-            id=pa.article.id,
-            title=pa.article.title,
-            accred=pa.article.accred,
-            abstract=pa.article.abstract,
-            year=pa.article.year,
-            article_url=pa.article.article_url,
-            journal=pa.article.journal,
-            doi=pa.article.doi,
-            citation_count=pa.article.citation_count,
-            source=pa.article.source,
-            author_order=pa.author_order,
-            author_id=pa.author.id if pa.author else 0,
-            author_name=pa.author.user.name if pa.author and pa.author.user else "Unknown"
-        )
-        for pa in paginated
-    ]
+    articles_data = []
+    for article in paginated:
+        author_list = []
+        for pa in article.authors:
+            if pa.author and pa.author.user:
+                author_list.append(ArticleAuthorResponse(
+                    author_id=pa.author.id,
+                    author_name=pa.author.user.name,
+                    author_order=pa.author_order
+                ))
+
+        articles_data.append(ArticleResponse(
+            id=article.id,
+            title=article.title,
+            year=article.year,
+            doi=article.doi,
+            accred=article.accred,
+            abstract=article.abstract,
+            citation_count=article.citation_count,
+            article_url=article.article_url,
+            journal=article.journal,
+            source=article.source,
+            authors=author_list
+        ))
 
     return StandardResponse(
         success=True,
@@ -80,7 +85,6 @@ def get_all_articles(
             "articles": articles_data
         }
     )
-     
 
 @router.get("/search/articles/authors", response_model=StandardResponse)
 def search_articles_by_authors(
@@ -88,74 +92,77 @@ def search_articles_by_authors(
     source: Optional[str] = Query(None, description="Filter by source: SCOPUS, SINTA"),
     min_year: Optional[int] = Query(None),
     max_year: Optional[int] = Query(None),
-    sort_by_citation: Optional[bool] = Query(False, description="Sort by citation count"),
+    sort_by_citation: Optional[bool] = Query(False),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
+    # Temukan user berdasarkan nama
     users = db.query(User).filter(func.lower(User.name).like(f"%{name.lower()}%")).all()
     if not users:
         raise HTTPException(status_code=404, detail="Authors not found")
 
-    articles_query = []
-    for user in users:
-        author = user.author
-        if not author:
+    matched_author_ids = [user.author.id for user in users if user.author]
+    if not matched_author_ids:
+        raise HTTPException(status_code=404, detail="Authors found but no associated author records")
+
+    # Temukan semua artikel yang memiliki author tersebut
+    article_set = set()
+    for author_id in matched_author_ids:
+        pa_records = db.query(Article).join(Article.authors).filter_by(author_id=author_id).all()
+        article_set.update(pa_records)
+
+    # Filter
+    filtered_articles = []
+    for article in article_set:
+        if source and (not article.source or source.upper() not in article.source.upper()):
             continue
-        for pa in author.publications:
-            if not pa.article:
-                continue
-            article = pa.article
+        if min_year and article.year and article.year < min_year:
+            continue
+        if max_year and article.year and article.year > max_year:
+            continue
+        filtered_articles.append(article)
 
-            # Filter berdasarkan source
-            if source and article.source != source.upper():
-                continue
-
-            # Filter tahun
-            if min_year and article.year and article.year < min_year:
-                continue
-            if max_year and article.year and article.year > max_year:
-                continue
-
-            articles_query.append({
-                "article": article,
-                "author_name": user.name,
-                "author_id": author.id,
-                "author_order": pa.author_order
-            })
-
-    # Sorting
+    # Sort
     if sort_by_citation:
-        articles_query.sort(
-            key=lambda x: (x["article"].citation_count is None, -(x["article"].citation_count or 0))
+        filtered_articles.sort(
+            key=lambda x: (x.citation_count is None, -(x.citation_count or 0))
         )
     else:
-        articles_query.sort(
-            key=lambda x: x["article"].year if x["article"].year else 0, reverse=True
+        filtered_articles.sort(
+            key=lambda x: x.year if x.year else 0, reverse=True
         )
 
     # Pagination
-    total = len(articles_query)
+    total = len(filtered_articles)
     start = (page - 1) * limit
     end = start + limit
-    paginated = articles_query[start:end]
+    paginated = filtered_articles[start:end]
 
-    articles = [
-        ArticleResponse(
-            id=item["article"].id,
-            title=item["article"].title,
-            year=item["article"].year,
-            accred=item["article"].accred,
-            doi=item["article"].doi,
-            article_url=item["article"].article_url,
-            journal=item["article"].journal,
-            source=item["article"].source,
-            author_order=item["author_order"],
-            author_name=item["author_name"],
-            author_id=item["author_id"]
-        )
-        for item in paginated
-    ]
+    # Response dengan list penulis lengkap
+    articles_response = []
+    for article in paginated:
+        author_list = []
+        for pa in article.authors:
+            if pa.author and pa.author.user:
+                author_list.append(ArticleAuthorResponse(
+                    author_id=pa.author.id,
+                    author_name=pa.author.user.name,
+                    author_order=pa.author_order
+                ))
+        articles_response.append(ArticleResponse(
+            id=article.id,
+            title=article.title,
+            year=article.year,
+            doi=article.doi,
+            accred=article.accred,
+            abstract=article.abstract,
+            citation_count=article.citation_count,
+            article_url=article.article_url,
+            journal=article.journal,
+            source=article.source,
+            authors=author_list
+        ))
 
     return StandardResponse(
         success=True,
@@ -164,10 +171,9 @@ def search_articles_by_authors(
             "page": page,
             "limit": limit,
             "total": total,
-            "articles": articles
+            "articles": articles_response
         }
     )
-
 
 
 @router.get("/search/articles/title", response_model=StandardResponse)
@@ -181,51 +187,45 @@ def search_articles_by_title(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    # Query artikel yang judulnya mirip
-    articles_query = db.query(Article).filter(
+    # Query dasar: cari berdasarkan judul
+    query = db.query(Article).filter(
         func.lower(Article.title).like(f"%{title.lower()}%")
     )
 
     # Filter source
     if source:
-        articles_query = articles_query.filter(Article.source == source.upper())
+        query = query.filter(Article.source.ilike(f"%{source.upper()}%"))
 
     # Filter tahun
     if min_year:
-        articles_query = articles_query.filter(Article.year >= min_year)
+        query = query.filter(Article.year >= min_year)
     if max_year:
-        articles_query = articles_query.filter(Article.year <= max_year)
-
-    articles_list = articles_query.all()
+        query = query.filter(Article.year <= max_year)
 
     # Sorting
     if sort_by_citation:
-        articles_list.sort(key=lambda x: (x.citation_count is None, -(x.citation_count or 0)))
+        query = query.order_by(
+            case((Article.citation_count == None, 1), else_=0),
+            Article.citation_count.desc()
+        )
     else:
-        articles_list.sort(key=lambda x: x.year if x.year else 0, reverse=True)
+        query = query.order_by(Article.year.desc())
 
-    # Pagination
-    total = len(articles_list)
-    start = (page - 1) * limit
-    end = start + limit
-    paginated = articles_list[start:end]
+    total = query.count()
+    articles = query.offset((page - 1) * limit).limit(limit).all()
 
-    articles = []
-    for article in paginated:
-        authorships = article.authors  # relasi PublicationAuthor
-        sorted_authors = sorted(authorships, key=lambda x: x.author_order or 9999)
+    result = []
+    for article in articles:
+        author_list = []
+        for pa in sorted(article.authors, key=lambda x: x.author_order or 9999):
+            if pa.author and pa.author.user:
+                author_list.append(ArticleAuthorResponse(
+                    author_id=pa.author.id,
+                    author_name=pa.author.user.name,
+                    author_order=pa.author_order
+                ))
 
-        author_order = None
-        author_name = None
-        author_id = None
-        if sorted_authors:
-            first_author = sorted_authors[0]
-            if first_author.author and first_author.author.user:
-                author_order = first_author.author_order
-                author_name = first_author.author.user.name
-                author_id = first_author.author.id
-
-        articles.append(ArticleResponse(
+        result.append(ArticleResponse(
             id=article.id,
             title=article.title,
             accred=article.accred,
@@ -234,9 +234,9 @@ def search_articles_by_title(
             article_url=article.article_url,
             journal=article.journal,
             source=article.source,
-            author_order=author_order,
-            author_name=author_name,
-            author_id=author_id
+            abstract=article.abstract,
+            citation_count=article.citation_count,
+            authors=author_list
         ))
 
     return StandardResponse(
@@ -246,9 +246,10 @@ def search_articles_by_title(
             "page": page,
             "limit": limit,
             "total": total,
-            "articles": articles
+            "articles": result
         }
     )
+
 
 
 
@@ -262,8 +263,15 @@ def get_article_detail(
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    # Ambil relasi ke author pertama (jika ada)
-    pa = next((pa for pa in article.authors if pa.author and pa.author.user), None)
+    # Ambil semua authors
+    author_list = []
+    for pa in sorted(article.authors, key=lambda x: x.author_order or 9999):
+        if pa.author and pa.author.user:
+            author_list.append(ArticleAuthorResponse(
+                author_id=pa.author.id,
+                author_name=pa.author.user.name,
+                author_order=pa.author_order
+            ))
 
     response_data = ArticleResponse(
         id=article.id,
@@ -276,9 +284,7 @@ def get_article_detail(
         doi=article.doi,
         citation_count=article.citation_count,
         source=article.source,
-        author_order=pa.author_order if pa else None,
-        author_name=pa.author.user.name if pa and pa.author and pa.author.user else None,
-        author_id=pa.author.id if pa and pa.author else None
+        authors=author_list
     )
 
     return StandardResponse(
@@ -286,3 +292,4 @@ def get_article_detail(
         message="Detail artikel berhasil diambil.",
         data=response_data
     )
+
