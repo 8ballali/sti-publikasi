@@ -20,6 +20,11 @@ class CrawlAuthors(BaseModel):
     department: str
 
 
+class ArticleAuthorResponse(BaseModel):
+    author_id: int
+    author_name: str
+    author_order: Optional[int]
+
 class UserCreate(BaseModel):
     name: str
 
@@ -103,9 +108,7 @@ class ArticleResponse(BaseModel):
     doi: Optional[str] = None
     citation_count: Optional[int] = None
     source: Optional[str]
-    author_order: Optional[int]
-    author_name: Optional[str] = None
-    author_id: Optional[int] = None
+    authors: List[ArticleAuthorResponse]
 
     class Config:
         orm_mode = True
