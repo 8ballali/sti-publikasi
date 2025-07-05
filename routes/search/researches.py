@@ -175,7 +175,6 @@ def search_researches_by_authors(
     researches = [
         ResearchResponse(
             title=item["research"].title,
-            leader=item["leader"],
             jenis_penelitian=item["research"].fund_type,
             personils=item["personils"],
             year=item["research"].year,
@@ -183,7 +182,8 @@ def search_researches_by_authors(
             status_penelitian=item["research"].fund_status,
             sumber_pendanaan=item["research"].fund_source,
             author_name=item["author_name"],
-            author_id=item["author_id"]
+            author_id=item["author_id"],
+            leader_name=item["leader"],
         )
         for item in paginated
     ]
@@ -284,7 +284,6 @@ def search_researches_by_title(
     researches = [
         ResearchResponse(
             title=item["research"].title,
-            leader=item["leader"],
             jenis_penelitian=item["research"].fund_type,
             personils=item["personils"],
             year=item["research"].year,

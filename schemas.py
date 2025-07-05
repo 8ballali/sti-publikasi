@@ -77,7 +77,6 @@ class GarudaAbstractResponse(BaseModel):
 
 class ResearchResponse(BaseModel):
     title: str
-    leader: str
     jenis_penelitian: str
     personils: Optional[str]
     year: Optional[int]
