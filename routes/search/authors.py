@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from schemas import AuthorDetailResponse, ArticleResponse, ResearchResponse
+from schemas import AuthorDetailResponse, ArticleResponse, ResearchResponse, ArticleAuthorResponse
 from repository.author_crawl import get_top_authors
 from typing import Optional
 from models import Author, User, PublicationAuthor, Article, Research, ResearcherAuthor
@@ -118,16 +118,29 @@ def get_author_detail(
     for pa in paginated_articles:
         a = pa.article
         if a:
+            # Ambil semua authors untuk artikel ini
+            author_list = sorted([
+                ArticleAuthorResponse(
+                    author_id=apa.author.id,
+                    author_name=apa.author.user.name,
+                    author_order=apa.author_order
+                )
+                for apa in a.authors
+                if apa.author and apa.author.user
+            ], key=lambda x: x.author_order or 9999)
+
             articles.append(ArticleResponse(
                 id=a.id,
                 title=a.title,
+                accred=a.accred,
+                abstract=a.abstract,
                 year=a.year,
                 article_url=a.article_url,
                 journal=a.journal,
+                doi=a.doi,
+                citation_count=a.citation_count,
                 source=a.source,
-                author_order=pa.author_order,
-                author_id=pa.author.id,
-                author_name=pa.author.user.name if pa.author and pa.author.user else "Unknown"
+                authors=author_list
             ))
 
     # ==== RESEARCHES with pagination ====
@@ -142,18 +155,15 @@ def get_author_detail(
         if not r:
             continue
 
-        leader_ra = next((x for x in r.authors if x.is_leader), None)
-        leader_name = leader_ra.author.user.name if leader_ra and leader_ra.author and leader_ra.author.user else "Unknown"
-
         personils_list = [
             x.author.user.name for x in r.authors
-            if x.author and x.author.user and not x.is_leader
+            if x.author and x.author.user and x.author.id != author.id
         ]
-        personils = ", ".join(personils_list) if personils_list else None
+        personils = "; ".join(personils_list) if personils_list else None
 
         researches.append(ResearchResponse(
             title=r.title,
-            leader=leader_name,
+            leader_name=r.leader_name or "Unknown",  # pakai field langsung dari tabel research
             jenis_penelitian=r.fund_type,
             personils=personils,
             year=r.year,
@@ -164,6 +174,7 @@ def get_author_detail(
             author_name=user.name
         ))
 
+    # ==== FINAL RESPONSE ====
     author_detail = AuthorDetailResponse(
         id=author.id,
         name=user.name,
