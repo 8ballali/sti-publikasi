@@ -129,7 +129,8 @@ def get_author_detail(
                 ArticleAuthorResponse(
                     author_id=apa.author.id,
                     author_name=apa.author.user.name,
-                    author_order=apa.author_order
+                    author_order=apa.author_order,
+                    avatar=f"https://simpeg.dinus.ac.id/updir/small_med_{apa.author.user.npp}.jpg" if apa.author.user.npp else None
                 )
                 for apa in a.authors
                 if apa.author and apa.author.user
