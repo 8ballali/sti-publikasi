@@ -28,11 +28,12 @@ def get_top_authors_articles(
         db.query(
             Author.id.label("author_id"),
             User.name.label("name"),
+            User.npp.label("npp"),
             func.count(PublicationAuthor.article_id).label("article_count")
         )
         .join(User, Author.user_id == User.id)
         .join(PublicationAuthor, PublicationAuthor.author_id == Author.id)
-        .group_by(Author.id, User.name)
+        .group_by(Author.id, User.name, User.npp)
         .order_by(func.count(PublicationAuthor.article_id).desc())
         .limit(limit)
         .all()
@@ -40,11 +41,13 @@ def get_top_authors_articles(
 
     data = []
     for idx, r in enumerate(results, start=1):
+        avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{r.npp}.jpg" if r.npp else None
         data.append({
             "rank": idx,
             "author_id": r.author_id,
             "name": r.name or "-",
-            "article_count": r.article_count
+            "article_count": r.article_count,
+            "avatar": avatar_url
         })
 
     return {
@@ -52,7 +55,6 @@ def get_top_authors_articles(
         "message": "Top authors by articles fetched successfully",
         "data": data
     }
-
 
 @router.get("/stats/top-authors/researches")
 def get_top_authors_researches(
@@ -63,11 +65,12 @@ def get_top_authors_researches(
         db.query(
             Author.id.label("author_id"),
             User.name.label("name"),
+            User.npp.label("npp"),
             func.count(ResearcherAuthor.researcher_id).label("research_count")
         )
         .join(User, Author.user_id == User.id)
         .join(ResearcherAuthor, ResearcherAuthor.author_id == Author.id)
-        .group_by(Author.id, User.name)
+        .group_by(Author.id, User.name, User.npp)
         .order_by(func.count(ResearcherAuthor.researcher_id).desc())
         .limit(limit)
         .all()
@@ -75,11 +78,13 @@ def get_top_authors_researches(
 
     data = []
     for idx, r in enumerate(results, start=1):
+        avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{r.npp}.jpg" if r.npp else None
         data.append({
             "rank": idx,
             "author_id": r.author_id,
             "name": r.name or "-",
-            "research_count": r.research_count
+            "research_count": r.research_count,
+            "avatar": avatar_url
         })
 
     return {
@@ -87,6 +92,7 @@ def get_top_authors_researches(
         "message": "Top authors by researches fetched successfully",
         "data": data
     }
+
 
 
 @router.get("/authors/{author_id}", response_model=StandardResponse)
@@ -163,7 +169,7 @@ def get_author_detail(
 
         researches.append(ResearchResponse(
             title=r.title,
-            leader_name=r.leader_name or "Unknown",  # pakai field langsung dari tabel research
+            leader_name=r.leader_name or "Unknown",
             jenis_penelitian=r.fund_type,
             personils=personils,
             year=r.year,
@@ -174,10 +180,15 @@ def get_author_detail(
             author_name=user.name
         ))
 
+    # ==== Bikin URL avatar dari NPP ====
+    npp = user.npp
+    avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{npp}.jpg" if npp else None
+
     # ==== FINAL RESPONSE ====
     author_detail = AuthorDetailResponse(
         id=author.id,
         name=user.name,
+        avatar=avatar_url,
         sinta_profile_url=author.sinta_profile_url,
         sinta_score_3yr=author.sinta_score_3yr,
         sinta_score_total=author.sinta_score_total,
@@ -185,7 +196,8 @@ def get_author_detail(
         affil_score_total=author.affil_score_total,
         subjects=subjects,
         articles=articles,
-        researches=researches
+        researches=researches,
+        
     )
 
     return StandardResponse(
@@ -193,3 +205,4 @@ def get_author_detail(
         message="Authors fetched successfully",
         data=author_detail
     )
+
