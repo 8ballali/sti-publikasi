@@ -7,6 +7,7 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=True)
+    npp = Column(String(255), nullable=True)
     author = relationship("Author", back_populates="user", uselist=False)
 
 class Author(Base):

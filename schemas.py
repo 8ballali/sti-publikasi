@@ -24,6 +24,7 @@ class ArticleAuthorResponse(BaseModel):
     author_id: int
     author_name: str
     author_order: Optional[int]
+    avatar: Optional[str]
 
 class UserCreate(BaseModel):
     name: str
@@ -140,6 +141,7 @@ class AuthorSearchResponse(BaseModel):
 class AuthorDetailResponse(BaseModel):
     id: int
     name: Optional[str]  # from User
+    avatar: Optional[str] 
     sinta_profile_url: Optional[str]
     sinta_score_3yr: Optional[str]
     sinta_score_total: Optional[str]
@@ -148,6 +150,7 @@ class AuthorDetailResponse(BaseModel):
     subjects: List[str]
     articles: List[ArticleResponse]
     researches: List[ResearchResponse]
+    
 
 
 

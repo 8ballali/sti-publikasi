@@ -54,6 +54,9 @@ async def upload_sinta_authors(file: UploadFile = File(...), db: Session = Depen
         if not name:
             continue
 
+        raw_npp = row.get("npp", None)
+        npp = str(raw_npp).strip() if pd.notna(raw_npp) else None
+
         sinta_id = str(row.get("Sinta ID", "")).strip()
         profile_link = str(row.get("Profile Link", "")).strip()
         department = str(row.get("Department", "")).strip()
@@ -69,10 +72,14 @@ async def upload_sinta_authors(file: UploadFile = File(...), db: Session = Depen
         # 1. Cek User berdasarkan nama
         user = db.query(User).filter(User.name == name).first()
         if not user:
-            user = User(name=name)
+            user = User(name=name, npp=npp)
             db.add(user)
             db.commit()
             db.refresh(user)
+        else:
+            if npp:  # hanya update jika npp ada
+                user.npp = npp
+                db.commit()
 
         # 2. Cek apakah Author sudah ada berdasarkan user_id
         author = db.query(Author).filter(Author.user_id == user.id).first()

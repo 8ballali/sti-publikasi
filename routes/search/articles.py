@@ -53,12 +53,17 @@ def get_all_articles(
     articles_data = []
     for article in paginated:
         author_list = []
-        for pa in article.authors:
+        for pa in sorted(article.authors, key=lambda x: x.author_order or 9999):
             if pa.author and pa.author.user:
+                user = pa.author.user
+                npp = user.npp
+                avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{npp}.jpg" if npp else None
+
                 author_list.append(ArticleAuthorResponse(
                     author_id=pa.author.id,
-                    author_name=pa.author.user.name,
-                    author_order=pa.author_order
+                    author_name=user.name,
+                    author_order=pa.author_order,
+                    avatar=avatar_url
                 ))
 
         articles_data.append(ArticleResponse(
@@ -85,6 +90,7 @@ def get_all_articles(
             "articles": articles_data
         }
     )
+
 
 @router.get("/search/articles/authors", response_model=StandardResponse)
 def search_articles_by_authors(
@@ -139,17 +145,23 @@ def search_articles_by_authors(
     end = start + limit
     paginated = filtered_articles[start:end]
 
-    # Response dengan list penulis lengkap
+    # Response dengan list penulis lengkap + avatar
     articles_response = []
     for article in paginated:
         author_list = []
-        for pa in article.authors:
+        for pa in sorted(article.authors, key=lambda x: x.author_order or 9999):
             if pa.author and pa.author.user:
+                user = pa.author.user
+                npp = user.npp
+                avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{npp}.jpg" if npp else None
+
                 author_list.append(ArticleAuthorResponse(
                     author_id=pa.author.id,
-                    author_name=pa.author.user.name,
-                    author_order=pa.author_order
+                    author_name=user.name,
+                    author_order=pa.author_order,
+                    avatar=avatar_url
                 ))
+
         articles_response.append(ArticleResponse(
             id=article.id,
             title=article.title,
@@ -174,6 +186,7 @@ def search_articles_by_authors(
             "articles": articles_response
         }
     )
+
 
 
 @router.get("/search/articles/title", response_model=StandardResponse)
@@ -219,10 +232,15 @@ def search_articles_by_title(
         author_list = []
         for pa in sorted(article.authors, key=lambda x: x.author_order or 9999):
             if pa.author and pa.author.user:
+                user = pa.author.user
+                npp = user.npp
+                avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{npp}.jpg" if npp else None
+
                 author_list.append(ArticleAuthorResponse(
                     author_id=pa.author.id,
-                    author_name=pa.author.user.name,
-                    author_order=pa.author_order
+                    author_name=user.name,
+                    author_order=pa.author_order,
+                    avatar=avatar_url
                 ))
 
         result.append(ArticleResponse(
@@ -267,10 +285,15 @@ def get_article_detail(
     author_list = []
     for pa in sorted(article.authors, key=lambda x: x.author_order or 9999):
         if pa.author and pa.author.user:
+            user = pa.author.user
+            npp = user.npp
+            avatar_url = f"https://simpeg.dinus.ac.id/updir/small_med_{npp}.jpg" if npp else None
+
             author_list.append(ArticleAuthorResponse(
                 author_id=pa.author.id,
-                author_name=pa.author.user.name,
-                author_order=pa.author_order
+                author_name=user.name,
+                author_order=pa.author_order,
+                avatar=avatar_url
             ))
 
     response_data = ArticleResponse(
@@ -292,4 +315,3 @@ def get_article_detail(
         message="Detail artikel berhasil diambil.",
         data=response_data
     )
-
