@@ -24,7 +24,16 @@ class ArticleAuthorResponse(BaseModel):
     author_id: int
     author_name: str
     author_order: Optional[int]
-    avatar: Optional[str]
+    avatar: Optional[str] = None
+
+
+class ArticleAuthorNoAvatarResponse(BaseModel):
+    author_id: int
+    author_name: str
+    author_order: Optional[int]
+
+    class Config:
+        orm_mode = True
 
 class UserCreate(BaseModel):
     name: str
@@ -113,6 +122,22 @@ class ArticleResponse(BaseModel):
     class Config:
         orm_mode = True
 
+class ArticleResponseNoAbstract(BaseModel):
+    id: int
+    title: str
+    accred: Optional[str] = None
+    year: Optional[int]
+    article_url: Optional[str]
+    journal: Optional[str]
+    doi: Optional[str] = None
+    citation_count: Optional[int] = None
+    source: Optional[str]
+    authors: List[ArticleAuthorNoAvatarResponse]
+
+    class Config:
+        orm_mode = True
+
+
 class ArticleWithAuthorsResponse(BaseModel):
     id: int
     title: str
@@ -151,8 +176,6 @@ class AuthorDetailResponse(BaseModel):
     articles: List[ArticleResponse]
     researches: List[ResearchResponse]
     
-
-
 
 class TopAuthorResponse(BaseModel):
     author_id: int
