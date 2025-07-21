@@ -13,8 +13,6 @@ router = APIRouter(
     tags=['Articles Search']
 )
 
-def paginate_query(query, page: int, limit: int):
-    return query.offset((page - 1) * limit).limit(limit).all()
 
 
 @router.get("/articles", response_model=StandardResponse)
