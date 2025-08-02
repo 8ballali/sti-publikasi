@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
-from schemas import  ArticleResponse, ArticleAuthorResponse, ArticleResponseNoAbstract, ArticleAuthorNoAvatarResponse, StandardResponse
+from fastapi import APIRouter, Depends, Query, Path
+from schemas import  StandardResponse
 from typing import Optional
-from models import User, Article
 from sqlalchemy.orm import Session
 from database import get_db
 from sqlalchemy import func, case

@@ -6,7 +6,6 @@ from schemas import StandardResponse  # pastikan diimport
 from sqlalchemy import func
 from datetime import datetime
 
-router = APIRouter()
 router = APIRouter(
     tags=['Statistics']
 )

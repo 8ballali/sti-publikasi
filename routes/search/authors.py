@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from schemas import AuthorDetailResponse, ArticleResponse, ResearchResponse, ArticleAuthorResponse
+from fastapi import APIRouter, Depends, Query
+from schemas import AuthorDetailResponse, ArticleResponse, ResearchResponse, ArticleAuthorResponse, ArticleResponseNoAbstractWithAvatar
 from repository.author_crawl import get_top_authors
-from typing import Optional
-from models import Author, User, PublicationAuthor, Article, Research, ResearcherAuthor
+from models import Author, User, PublicationAuthor, ResearcherAuthor
 from sqlalchemy.orm import Session
 from database import get_db
 from sqlalchemy import func
@@ -136,11 +135,10 @@ def get_author_detail(
                 if apa.author and apa.author.user
             ], key=lambda x: x.author_order or 9999)
 
-            articles.append(ArticleResponse(
+            articles.append(ArticleResponseNoAbstractWithAvatar(
                 id=a.id,
                 title=a.title,
                 accred=a.accred,
-                abstract=a.abstract,
                 year=a.year,
                 article_url=a.article_url,
                 journal=a.journal,
@@ -206,4 +204,3 @@ def get_author_detail(
         message="Authors fetched successfully",
         data=author_detail
     )
-

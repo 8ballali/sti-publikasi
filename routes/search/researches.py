@@ -1,7 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from schemas import ResearchResponse
+from fastapi import APIRouter, Depends, Query
 from typing import Optional, Literal
-from models import User,Research
 from sqlalchemy.orm import Session
 from database import get_db
 from sqlalchemy import func, case

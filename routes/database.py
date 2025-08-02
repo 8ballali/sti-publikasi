@@ -1,11 +1,7 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 from database import get_db
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import sessionmaker, Session
+from fastapi import Depends, HTTPException
 from database import Base, engine
-
-router = APIRouter()
 
 router = APIRouter(
     tags=['Database']
