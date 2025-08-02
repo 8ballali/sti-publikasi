@@ -8,8 +8,6 @@ from sqlalchemy import func
 from models import User
 
 
-
-
 def get_all_researches_service(
     db: Session,
     min_year: Optional[int],

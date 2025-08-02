@@ -6,20 +6,13 @@ from difflib import get_close_matches
 from database import get_db
 from models import User, Author, Article, PublicationAuthor
 from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data, scholar_sync
-from bs4 import BeautifulSoup
-import requests, re
+import re
 import unicodedata
-from schemas import ArticleResponse
-from typing import List
 from sqlalchemy import and_
-
-
-router = APIRouter()
 
 router = APIRouter(
     tags=['Google_Scholar']
 )
-
 
 def generate_initials(name: str) -> str:
     parts = name.strip().split()
@@ -50,9 +43,6 @@ async def sync_scholar(db: Session = Depends(get_db)):
             results.extend(scraped_data)
 
     return {"message": "Sync Data Article Google Scholar Selesai"}
-
-
-
 
 
 def normalize(text: str) -> str:

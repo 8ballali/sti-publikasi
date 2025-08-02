@@ -4,20 +4,15 @@ from database import get_db
 from repository.garuda_abstract_crawl import garuda_data,garuda_scrapping, garuda_sync, garuda_abstract_scraping
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from bs4 import BeautifulSoup
-import requests, time
-import re
 from repository.garuda_abstract_crawl import get_lecturers_with_profiles, save_scraped_data_to_db
 from models import User, Author, Article, PublicationAuthor
 from schemas import GarudaAbstractResponse
-import io
 import pandas as pd
 from sqlalchemy import or_, and_
 
 router = APIRouter(
     tags=['Garuda Data']
 )
-
 
 @router.post("/upload/garuda")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -90,7 +85,6 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         "inserted_articles": inserted_articles,
         "inserted_publication_authors": inserted_relations
     }
-
 
 @router.get("/scrape/abstract/garuda")
 async def abstract_garuda(db: Session = Depends(get_db)):

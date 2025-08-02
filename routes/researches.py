@@ -1,20 +1,13 @@
-from fastapi import APIRouter,  Depends, HTTPException, UploadFile, File, BackgroundTasks
-import csv
-from io import StringIO
+from fastapi import APIRouter,  Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, Author, ResearcherAuthor, Research
-from bs4 import BeautifulSoup
+from models import Author, ResearcherAuthor, Research
 from repository.scholar_abstract_crawl import scholar_scrapping,scholar_data, scholar_sync
 from repository.research_crawl import research_sync
 import re
-import requests
-import time
 import pandas as pd
-from io import BytesIO
 from models import Research, ResearcherAuthor
 import io
-from repository import crud
 
 router = APIRouter(
     tags=['Researches Data']
@@ -62,7 +55,7 @@ def upload_research_csv(file: UploadFile = File(...), db: Session = Depends(get_
                     fund_source=fund_source,
                     fund_type=fund_type,
                     year=year,
-                    leader_name=leader_name  # ✅ tambahkan nama leader manual jika tidak ada di DB
+                    leader_name=leader_name  # tambahkan nama leader manual jika tidak ada di DB
                 )
                 db.add(research)
                 db.commit()

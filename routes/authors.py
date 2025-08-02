@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from typing import List
 from sqlalchemy.orm import Session
 from database import get_db
-from repository.author_crawl import scrape_sinta, scrape_and_save_authors, get_top_authors
-from models import User, Author, Subject, UserSubject
+from repository.author_crawl import scrape_and_save_authors, get_top_authors
+from models import User, Author
 from repository.subject_crawl import scrape_all_subjects
-from schemas import TopAuthorResponse
+
 
 import pandas as pd
 from io import StringIO, BytesIO

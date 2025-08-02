@@ -1,5 +1,3 @@
-# services/article.py
-
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any, List, Tuple, Optional
 from sqlalchemy import case

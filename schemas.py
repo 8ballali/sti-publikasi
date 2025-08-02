@@ -137,6 +137,21 @@ class ArticleResponseNoAbstract(BaseModel):
     class Config:
         orm_mode = True
 
+class ArticleResponseNoAbstractWithAvatar(BaseModel):
+    id: int
+    title: str
+    accred: Optional[str] = None
+    year: Optional[int]
+    article_url: Optional[str]
+    journal: Optional[str]
+    doi: Optional[str] = None
+    citation_count: Optional[int] = None
+    source: Optional[str]
+    authors: List[ArticleAuthorResponse]
+
+    class Config:
+        orm_mode = True
+
 
 class ArticleWithAuthorsResponse(BaseModel):
     id: int
@@ -173,7 +188,7 @@ class AuthorDetailResponse(BaseModel):
     affil_score_3yr: Optional[str]
     affil_score_total: Optional[str]
     subjects: List[str]
-    articles: List[ArticleResponse]
+    articles: List[ArticleResponseNoAbstractWithAvatar]
     researches: List[ResearchResponse]
     
 
